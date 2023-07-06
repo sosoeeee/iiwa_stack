@@ -14,7 +14,10 @@ def callBack(msg):
 def listener():
     rospy.init_node('listener', anonymous=True)
     rospy.Subscriber('/iiwa/state/CartesianPose', CartesianPose, callBack, queue_size=1)
-    rospy.spin()
+    # rospy.spin() // 会阻塞，不会执行下面的语句
 
 if __name__ == '__main__':
     listener()
+    
+    while not rospy.is_shutdown():
+        print(CartesianPosition)
