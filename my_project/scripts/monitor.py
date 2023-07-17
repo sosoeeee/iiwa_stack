@@ -1,4 +1,4 @@
-__author__ = 'Ted'
+#!/usr/bin/env python3
 
 import sys
 from PyQt5.Qt import *
@@ -7,12 +7,26 @@ from PyQt5 import QtCore
 import numpy as np
 import pyqtgraph as pq
 
+import rospy
+from std_msgs.msg import String
 
 PosX = [0]
 PosY = [0]
 
+class ROSListenerThread(QtCore.QThread):
+    # 定义一个信号
+    rosSignal = QtCore.pyqtSignal(str)
 
-class Window(QWidget):
+    def run(self):
+        rospy.Subscriber("controllerSignal", String, self.callback)
+        rospy.spin()
+
+    def callback(self, msg):
+        # rospy.loginfo(rospy.get_caller_id() + "I heard %s", msg.data)
+        self.rosSignal.emit(msg.data)
+
+
+class Figure(QWidget):
     def __init__(self):
         super().__init__()
         # 设置下尺寸
@@ -24,44 +38,48 @@ class Window(QWidget):
         # 设置 PlotWidget 控件的坐标轴范围
         self.plotWidget_ted.setXRange(-100, 100)
         self.plotWidget_ted.setYRange(-100, 100)
-        # 设置 PlotWidget 控件的坐标轴分度值
-        self.plotWidget_ted.setXTicks(np.linspace(-100, 100, 21))
 
-        # 仿写 mode1 代码中的数据
-        # 生成 300 个正态分布的随机数
-        self.data1 = np.random.normal(size=300)
+        self.trajectory = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolPen='w', symbolBrush='w', name="mode2")
 
-        self.curve2 = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolPen='w', symbolBrush='w', name="mode2")
-        self.ptr1 = 0
+        # ROS 监听器
+        self.listener_thread = ROSListenerThread()
+        self.listener_thread.rosSignal.connect(self.updateTrajectory)
+        self.listener_thread.start()
+        
+        # # 设定定时器
+        # self.timer = pq.QtCore.QTimer()
+        # # 定时器信号绑定 update_data 函数
+        # self.timer.timeout.connect(self.update_data)
+        # # 定时器间隔50ms，可以理解为 50ms 刷新一次数据
+        # self.timer.start(50)
 
-        # 设定定时器
-        self.timer = pq.QtCore.QTimer()
-        # 定时器信号绑定 update_data 函数
-        self.timer.timeout.connect(self.update_data)
-        # 定时器间隔50ms，可以理解为 50ms 刷新一次数据
-        self.timer.start(50)
+    # def keyPressEvent(self, event):
+    #     # print(event.key())
+    #     if event.key() == Qt.Key_W:
+    #         PosX.append(PosX[-1] + 1)
+    #         PosY.append(PosY[-1])
 
-    def keyPressEvent(self, event):
-        # print(event.key())
-        if event.key() == Qt.Key_W:
-            PosX.append(PosX[-1] + 1)
-            PosY.append(PosY[-1])
+    #     if event.key() == Qt.Key_S:
+    #         PosX.append(PosX[-1] - 1)
+    #         PosY.append(PosY[-1])
 
-        if event.key() == Qt.Key_S:
-            PosX.append(PosX[-1] - 1)
-            PosY.append(PosY[-1])
+    #     if event.key() == Qt.Key_A:
+    #         PosX.append(PosX[-1])
+    #         PosY.append(PosY[-1] - 1)
 
-        if event.key() == Qt.Key_A:
-            PosX.append(PosX[-1])
-            PosY.append(PosY[-1] - 1)
+    #     if event.key() == Qt.Key_D:
+    #         PosX.append(PosX[-1])
+    #         PosY.append(PosY[-1] + 1)
 
-        if event.key() == Qt.Key_D:
-            PosX.append(PosX[-1])
-            PosY.append(PosY[-1] + 1)
-
-        self.curve2.setData(PosY, PosX)
+    #     self.trajectory.setData(PosY, PosX)
         # self.curve2.setPos(self.ptr1, 0)
 
+    def updateTrajectory(self, point):
+        # 按逗号分割字符串
+        point = point.split(',')
+        # 将字符串转换为浮点数
+        point = [float(i) for i in point]
+        print(point)
 
 
     # # 数据左移
@@ -75,13 +93,17 @@ class Window(QWidget):
     #     # 重新设定 x 相关的坐标原点
     #
 
+# https://blog.csdn.net/qq_39550025/article/details/126043789
 
 if __name__ == '__main__':
+    # ROS 节点初始化
+    rospy.init_node('monitorListener', anonymous=True)
+
     # PyQt5 程序固定写法
     app = QApplication(sys.argv)
 
     # 将绑定了绘图控件的窗口实例化并展示
-    window = Window()
+    window = Figure()
     window.show()
 
     # PyQt5 程序固定写法
