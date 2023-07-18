@@ -12,6 +12,11 @@ from std_msgs.msg import String
 
 PosX = [0]
 PosY = [0]
+deltaT = 0.05
+len = 50
+t = np.arange(0, len*deltaT, deltaT)
+speedAmplitude = 0.5
+monitorAmplitude = 3000
 
 class ROSListenerThread(QtCore.QThread):
     # 定义一个信号
@@ -36,8 +41,8 @@ class Figure(QWidget):
         # 设置该控件尺寸和相对位置
         self.plotWidget_ted.setGeometry(QtCore.QRect(25, 25, 550, 550))
         # 设置 PlotWidget 控件的坐标轴范围
-        self.plotWidget_ted.setXRange(-100, 100)
-        self.plotWidget_ted.setYRange(-100, 100)
+        self.plotWidget_ted.setXRange(-300, 300)
+        self.plotWidget_ted.setYRange(-300, 300)
 
         self.trajectory = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolPen='w', symbolBrush='w', name="mode2")
 
@@ -79,7 +84,18 @@ class Figure(QWidget):
         point = point.split(',')
         # 将字符串转换为浮点数
         point = [float(i) for i in point]
-        print(point)
+
+        distance = (point[0]**2 + point[1]**2)**0.5
+        if distance > 0.01:
+            speed = distance * speedAmplitude
+            cos = point[0] / distance
+            sin = point[1] / distance
+            PosX = speed * cos * t * monitorAmplitude
+            PosY = speed * sin * t * monitorAmplitude
+            self.trajectory.setData(PosX, PosY)
+        else:
+            self.trajectory.setData([0], [0])
+        
 
 
     # # 数据左移
