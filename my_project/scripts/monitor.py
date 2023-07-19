@@ -58,27 +58,6 @@ class Figure(QWidget):
         # # 定时器间隔50ms，可以理解为 50ms 刷新一次数据
         # self.timer.start(50)
 
-    # def keyPressEvent(self, event):
-    #     # print(event.key())
-    #     if event.key() == Qt.Key_W:
-    #         PosX.append(PosX[-1] + 1)
-    #         PosY.append(PosY[-1])
-
-    #     if event.key() == Qt.Key_S:
-    #         PosX.append(PosX[-1] - 1)
-    #         PosY.append(PosY[-1])
-
-    #     if event.key() == Qt.Key_A:
-    #         PosX.append(PosX[-1])
-    #         PosY.append(PosY[-1] - 1)
-
-    #     if event.key() == Qt.Key_D:
-    #         PosX.append(PosX[-1])
-    #         PosY.append(PosY[-1] + 1)
-
-    #     self.trajectory.setData(PosY, PosX)
-        # self.curve2.setPos(self.ptr1, 0)
-
     def updateTrajectory(self, point):
         # 按逗号分割字符串
         point = point.split(',')
@@ -87,7 +66,7 @@ class Figure(QWidget):
 
         distance = (point[0]**2 + point[1]**2)**0.5
         if distance > 0.01:
-            speed = distance * speedAmplitude
+            speed = distance * speedAmplitude  # max：2.5cm/s
             cos = point[0] / distance
             sin = point[1] / distance
             PosX = speed * cos * t * monitorAmplitude
@@ -96,20 +75,6 @@ class Figure(QWidget):
         else:
             self.trajectory.setData([0], [0])
         
-
-
-    # # 数据左移
-    # def update_data(self):
-    #     self.data1[:-1] = self.data1[1:]
-    #     self.data1[-1] = np.random.normal()
-    #     # 数据填充到绘制曲线中
-    #     self.curve2.setData(self.data1)
-    #     # x 轴记录点
-    #     self.ptr1 += 1
-    #     # 重新设定 x 相关的坐标原点
-    #
-
-# https://blog.csdn.net/qq_39550025/article/details/126043789
 
 if __name__ == '__main__':
     # ROS 节点初始化
