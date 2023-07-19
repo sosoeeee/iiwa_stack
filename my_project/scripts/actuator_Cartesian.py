@@ -51,7 +51,7 @@ def state_callBack(msg):
 
 if __name__ == '__main__':
     try:
-        rospy.init_node('talker', anonymous=True)
+        rospy.init_node('actuatorCartesian', anonymous=False)
         pub = rospy.Publisher('/iiwa/command/CartesianPose', PoseStamped, queue_size=10)
         rospy.Subscriber('/iiwa/state/CartesianPose', CartesianPose, state_callBack, queue_size=1)
         rospy.Subscriber('/keyboardCmd', String, cmd_callBack, queue_size=1)
