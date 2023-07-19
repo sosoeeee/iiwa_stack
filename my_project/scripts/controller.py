@@ -61,6 +61,7 @@ print("start to publish referTrajectory")
 ##########################################################################
 
 # 轨迹规划
+# 轨迹生成
 # 二维测试轨迹——圆形
 R = 0.1
 targetSpeed = 0.02         # m/s
@@ -81,6 +82,61 @@ speedMatrix = speedMatrix.T
 vx = speedMatrix.dot(x) * controllerFreq
 vy = speedMatrix.dot(y) * controllerFreq
 vz = speedMatrix.dot(z) * controllerFreq
+
+# 机械臂状态空间模型建立
+Md = 5 * np.eye(3)
+Cd = 75 * np.eye(3)
+Md_inv = np.linalg.inv(Md)
+A = np.zeros((6, 6))
+A[0:3, 3:6] = np.eye(3)
+A[3:6, 3:6] = -Md_inv.dot(Cd)
+Br = np.zeros((6, 3))
+Br[3:6, :] = Md_inv
+Bh = np.zeros((6, 3))
+Bh[3:6, :] = Md_inv
+C = np.zeros((3, 6))
+C[:, 0:3] = np.eye(3)
+
+# 离散化
+T = 1/controllerFreq
+Ad = np.eye(6) + A*T
+Brd = Br*T
+Bhd = Bh*T
+
+# 控制器参数设置
+N1 = 50
+phi = np.zeros((3*N1, 6))
+theta_h = np.zeros((3*N1, 3*N1))
+theta_r = np.zeros((3*N1, 3*N1))
+phi_row = C.dot(Ad)
+weight_r = 1
+weight_h = 0.1
+errorAmplitude = 10000
+Qii_r = np.eye(3) * weight_r * errorAmplitude
+Qii_h = np.eye(3) * weight_h * errorAmplitude
+Qr = np.zeros((3*N1, 3*N1))
+Qh = np.zeros((3*N1, 3*N1))
+
+for i in range(N1):
+    phi[(i*3+1):(3*i+3), :] = phi_row
+    Qr[(i*3+1):(3*i+3), (i*3+1):(3*i+3)] = Qii_r
+    Qh[(i*3+1):(3*i+3), (i*3+1):(3*i+3)] = Qii_h
+    theta_h_row = np.eye(6)
+    for j in range(i):
+        theta_h[(i*3+1):(3*i+3),(3*(i-j)+1):(3*(i-j)+3)] = np.dot(C, theta_h_row.dot(Bhd))
+        theta_r[(i*3+1):(3*i+3),(3*(i-j)+1):(3*(i-j)+3)] = np.dot(C, theta_h_row.dot(Brd))
+        theta_h_row = theta_h_row.dot(Ad)
+    phi_row = phi_row.dot(Ad)
+
+theta_hg = np.cstack((theta_h, theta_h))
+theta_rg = np.cstack((theta_r, theta_r))
+phi_g = np.cstack((phi, phi))
+
+# 初始化状态变量
+x_cur = np.zeros((6, 1))
+x_cur[0, 0] = x[0]
+x_cur[1, 0] = y[0]
+x_cur[2, 0] = z[0]
 
 i = 0
 while not rospy.is_shutdown():
