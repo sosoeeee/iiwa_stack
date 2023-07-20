@@ -8,6 +8,8 @@ from iiwa_msgs.msg import JointPositionVelocity
 from std_msgs.msg import String
 from Jacobian import Jacobian
 
+from utils import *
+
 currentJointPosition = np.zeros(7)
 currentJointVelocity = np.zeros(7)
 
@@ -50,25 +52,13 @@ def state_callBack(msg):
      currentJointPosition = toArray(msg.position)
      currentJointVelocity = toArray(msg.velocity)
 
-# 将JointPositionVelocity消息转换为numpy数组
-def toArray(msg):
-     ans = np.zeros(7)
-     ans[0] = msg.a1
-     ans[1] = msg.a2
-     ans[2] = msg.a3
-     ans[3] = msg.a4
-     ans[4] = msg.a5
-     ans[5] = msg.a6
-     ans[6] = msg.a7
-     return ans
-
 
 if __name__ == '__main__':
     try:
         rospy.init_node('actuatorJoint', anonymous=False)
         pub = rospy.Publisher('/iiwa/command/JointPosition', JointPosition, queue_size=10)
         rospy.Subscriber('/iiwa/state/JointPositionVelocity', JointPositionVelocity, state_callBack, queue_size=1)
-        rospy.Subscriber('/referTrajectory', String, cmd_callBack, queue_size=1)
+        rospy.Subscriber('/nextState', String, cmd_callBack, queue_size=1)
         rate = rospy.Rate(0.5) # 10hz
 
         rospy.spin()
