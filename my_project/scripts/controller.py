@@ -120,7 +120,7 @@ class Controller:
 
 ## 控制器初始化
 ##########################################################################
-controllerFreq = 20
+controllerFreq = 40
 initX = -0.35
 initY = -0.35
 initZ = 0.13

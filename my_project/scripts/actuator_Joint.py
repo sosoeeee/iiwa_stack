@@ -15,7 +15,7 @@ currentJointVelocity = np.zeros(7)
 
 firstFlag = True
 cmdJointPosition = JointPosition()
-controllerFreq = 20                     # Hz
+controllerFreq = 40                     # Hz
 
 def cmd_callBack(msg):
     cmd = msg.data

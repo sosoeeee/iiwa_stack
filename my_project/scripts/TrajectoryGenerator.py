@@ -28,7 +28,11 @@ def getCircle(R, targetSpeed, controllerFreq, initX, initY, initZ):
  
     vx = speedMatrix.dot(x) * controllerFreq 
     vy = speedMatrix.dot(y) * controllerFreq 
-    vz = speedMatrix.dot(z) * controllerFreq 
+    vz = speedMatrix.dot(z) * controllerFreq
+
+    # vx = -targetSpeed * np.sin(theta)
+    # vy =  targetSpeed * np.cos(theta)
+    # vz = np.zeros(len(theta))
 
     # 合并为一个6*len(theta)的矩阵
     trajectory = np.vstack((x, y, z, vx, vy, vz))
