@@ -18,8 +18,8 @@ monitorRefreshTime = 50                # ms
 
 humanX = [0]
 humanY = [0]
-stickFreq = 20                     # 控制频率
-deltaT = 1/stickFreq
+controllFreq = 20                     # 控制频率
+deltaT = 1/controllFreq
 len = 50                                # 人生成的期望轨迹长度
 t = np.arange(0, len*deltaT, deltaT)
 speedAmplitude = 0.5                    # 遥操作杆偏离中心的位置与机器人末端运动速度的比例系数
@@ -28,14 +28,14 @@ robotX = [0] * monitorLen
 robotY = [0] * monitorLen
 initX = -0.35
 initY = -0.35
+initZ = 0.13
 index = 0
 currentRobotX = 0
 currentRobotY = 0
 
 class TrajectoryListenerThread(QtCore.QThread):
     # 定义一个信号
-    rosSignal = QtCore.pyqtSignal(list)
-    TrajectoryType = QtCore.pyqtSignal(int)
+    dataSignal = QtCore.pyqtSignal(dict)
 
     def run(self):
         rospy.Subscriber("referRobotTrajectory", Float32MultiArray, self.callback_robot)
@@ -43,12 +43,18 @@ class TrajectoryListenerThread(QtCore.QThread):
         rospy.spin()
     
     def callback_robot(self, msg):
-        self.rosSignal.emit(msg.data)
-        self.TrajectoryType.emit(0)
+        dataDict = {}
+        dataDict['data'] = msg.data
+        dataDict['type'] = 0
+
+        self.dataSignal.emit(dataDict)
 
     def callback_human(self, msg):
-        self.rosSignal.emit(msg.data)
-        self.TrajectoryType.emit(1)
+        dataDict = {}
+        dataDict['data'] = msg.data
+        dataDict['type'] = 1
+
+        self.dataSignal.emit(dataDict)
 
 class StickListenerThread(QtCore.QThread):
     # 定义一个信号
@@ -80,14 +86,15 @@ class Figure(QWidget):
     def __init__(self):
         super().__init__()
         # 设置下尺寸
-        self.resize(600, 600)
+        self.length = 800
+        self.resize(self.length, self.length)
         # 添加 PlotWidget 控件
         self.plotWidget_ted = PlotWidget(self)
         # 设置该控件尺寸和相对位置
-        self.plotWidget_ted.setGeometry(QtCore.QRect(25, 25, 550, 550))
+        self.plotWidget_ted.setGeometry(QtCore.QRect(25, 25, self.length - 50, self.length - 50))
         # 设置 PlotWidget 控件的坐标轴范围
-        self.plotWidget_ted.setXRange(-300, 300)
-        self.plotWidget_ted.setYRange(-300, 300)
+        self.plotWidget_ted.setXRange(-600, 600)
+        self.plotWidget_ted.setYRange(-600, 600)
 
         self.humanIntent = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='w', name="mode1")
         self.robotPosition = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='r', name="mode2")
@@ -96,7 +103,7 @@ class Figure(QWidget):
 
         # Trajcetory 监听器
         self.trajectoryListener_thread = TrajectoryListenerThread()
-        self.trajectoryListener_thread.rosSignal.connect(self.updateTrajectory)
+        self.trajectoryListener_thread.dataSignal.connect(self.updateTrajectory)
         self.trajectoryListener_thread.start()
 
         # stick 监听器
@@ -135,25 +142,34 @@ class Figure(QWidget):
 
     def updateRobotTrajectory(self):
         global currentRobotX, currentRobotY, index
-        robotX[index] = currentRobotX * monitorAmplitude - initX * monitorAmplitude
-        robotY[index] = currentRobotY * monitorAmplitude - initY * monitorAmplitude
+        robotX[index] = (currentRobotX - initX) * monitorAmplitude 
+        robotY[index] = (currentRobotY - initY) * monitorAmplitude 
         index = (index + 1) % monitorLen
         # print(robotX)
 
         self.robotPosition.setData(robotX, robotY)
 
-    def updateTrajectory(self, data, type):
+    def updateTrajectory(self, dataDict):
         # 检查data类型
+        data = dataDict['data']
+        typeTraj = dataDict['type']
+        
+        print(typeTraj)
+
         data = np.array(data)
+        len = data.shape[0]
+        data = data.reshape((3, int(len/3)))
         data = data * monitorAmplitude
-        print(data)
-        print(type)
+
+        # 显示修正
+        data[0, :] = data[0, :] - initX * monitorAmplitude
+        data[1, :] = data[1, :] - initY * monitorAmplitude
 
         # Robot
-        if type == 0:
+        if typeTraj == 0:
             self.robotTrajectory.setData(data[0, :], data[1, :])
         # Human
-        elif type == 1:
+        elif typeTraj == 1:
             self.humanTrajectory.setData(data[0, :], data[1, :])
         
 

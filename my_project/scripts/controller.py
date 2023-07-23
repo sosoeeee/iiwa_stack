@@ -14,8 +14,8 @@ from sharedController import *
 
 ## 负责综合共享控制器、遥操作杆、机械臂状态信息，生成轨迹信息，并通过ROS发布给执行器
 class Controller:
-    def __init__(self):
-        # self.controllerFreq = controllerFreq  # Hz
+    def __init__(self, controllerFreq):
+        self.controllerFreq = controllerFreq  # Hz
 
         rospy.init_node('controller', anonymous=False)
         self.pub = rospy.Publisher('nextState', String, queue_size=10)
@@ -82,23 +82,34 @@ class Controller:
             self.currentVel = (np.array([self.currentPos.pose.position.x, self.currentPos.pose.position.y, self.currentPos.pose.position.z]) - np.array([self.lastPos.pose.position.x, self.lastPos.pose.position.y, self.lastPos.pose.position.z])) / deltaT
             self.currentState = np.array([self.currentPos.pose.position.x, self.currentPos.pose.position.y, self.currentPos.pose.position.z, self.currentVel[0], self.currentVel[1], self.currentVel[2]]).reshape((6, 1))
 
-            print("current state is: ", self.currentState)
+            # print("current state is: ", self.currentState)
 
     def publishState(self, nextState):
         self.pub.publish(nextState)
 
     def publishRobotTrajectory(self, Trajectory):
+        print("publish robot trajectory")
         # 只取位置信息
-        Trajectory = Trajectory.reshape[:3, :]
-        print("publishing robot trajectory", Trajectory.shape)
-        referTrajectory = Float32MultiArray(data = Trajectory)
+        Trajectory = Trajectory[:3, :]
+        referTrajectory = Float32MultiArray()
+        referTrajectory.data = Trajectory.flatten()
+
+        # 机器人轨迹发布后，等待一段时间，确保可以绘制出轨迹
+        rospy.sleep(1)
         self.pubMonitor_robot.publish(referTrajectory)
+
+        
     
     def publishHumanTrajectory(self, Trajectory):
-        Trajectory = Trajectory.reshape[:3, :]
-        print("publishing human trajectory", Trajectory.shape)
-        referTrajectory = Float32MultiArray(data = Trajectory)
+        print("publish human trajectory")
+        Trajectory = Trajectory[:3, :]
+        referTrajectory = Float32MultiArray()
+        referTrajectory.data = Trajectory.flatten()
+
+        # 机器人轨迹发布后，等待一段时间，确保可以绘制出轨迹
+        rospy.sleep(1)
         self.pubMonitor_human.publish(referTrajectory)
+
 
     def getCurrentState(self):
         return self.currentState
@@ -118,14 +129,15 @@ initOrientationY = 0.9418
 initOrientationZ = -0.0253
 initOrientationW = -0.0037
 
-controller = Controller()
-controller.setInitPos(initX, initY, initZ, initOrientationX, initOrientationY, initOrientationZ, initOrientationW)
+controller = Controller(controllerFreq)
+# controller.setInitPos(initX + R, initY, initZ, initOrientationX, initOrientationY, initOrientationZ, initOrientationW)
 
 ##########################################################################
 
 # 轨迹规划
 # 二维测试轨迹——圆形
-circleTrajectory = getCircle(0.1, 0.02, 20, initX, initY, initZ)
+R = 0.1
+circleTrajectory = getCircle(R, 0.02, 20, initX, initY, initZ)
 x = circleTrajectory[0, :]
 y = circleTrajectory[1, :]
 z = circleTrajectory[2, :]
@@ -135,7 +147,11 @@ vz = circleTrajectory[5, :]
 controller.publishRobotTrajectory(circleTrajectory)
 
 # 修改生成人类轨迹的参数
-# controller.publishHumanTrajectory(circleTrajectory)
+circleTrajectoryHuman = getCircleHuman(0.1, 0.02, 20, initX, initY, initZ)
+controller.publishHumanTrajectory(circleTrajectoryHuman)
+
+# 初始化机器人位姿
+controller.setInitPos(initX + R, initY, initZ, initOrientationX, initOrientationY, initOrientationZ, initOrientationW)
 
 # 引入共享控制器
 sharedcontroller = sharedController(controllerFreq)
@@ -146,23 +162,24 @@ i = 0
 while not rospy.is_shutdown():
     TrajectoryString = str(x[i]) + ',' + str(y[i]) + ',' + str(z[i]) + ',' + str(vx[i]) + ',' + str(vy[i]) + ',' + str(vz[i])
     
-    # 共享控制
-    w = controller.getCurrentState()
-    sharedcontroller.updateState(w)
-    endEffectorPos = w[0:3, 0]
-    stickPos = controller.getStickPos()
-    sharedcontroller.gethumanLocalTraj(stickPos, endEffectorPos)
-    humanIntent = sharedcontroller.getHumanIntent()
+    # # 共享控制
+    # w = controller.getCurrentState()
+    # sharedcontroller.updateState(w)
+    # endEffectorPos = w[0:3, 0]
+    # stickPos = controller.getStickPos()
+    # sharedcontroller.gethumanLocalTraj(stickPos, endEffectorPos)
+    # humanIntent = sharedcontroller.getHumanIntent()
 
-    # if humanIntent == 2:
-    #     changedTrajectory = sharedcontroller.changeGlobalTraj()
-    #     controller.publishRobotTrajectory(changedTrajectory)
-    # else:
-    #     w_next = sharedcontroller.computeLocalTraj(i)   
+    # # if humanIntent == 2:
+    # #     changedTrajectory = sharedcontroller.changeGlobalTraj()
+    # #     controller.publishRobotTrajectory(changedTrajectory)
+    # # else:
+    # #     w_next = sharedcontroller.computeLocalTraj(i)   
 
-    w_next = sharedcontroller.computeLocalTraj(i)   
+    # w_next = sharedcontroller.computeLocalTraj(i)   
 
-    TrajectoryString = str(w_next[0, 0]) + ',' + str(w_next[1, 0]) + ',' + str(w_next[2, 0]) + ',' + str(w_next[3, 0]) + ',' + str(w_next[4, 0]) + ',' + str(w_next[5, 0])
+    # TrajectoryString = str(w_next[0]) + ',' + str(w_next[1]) + ',' + str(w_next[2]) + ',' + str(w_next[3]) + ',' + str(w_next[4]) + ',' + str(w_next[5])
 
     controller.publishState(TrajectoryString)
     i = (i + 1) % len(x)
+    controller.rate.sleep()

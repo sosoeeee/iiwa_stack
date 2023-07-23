@@ -26,6 +26,7 @@ class sharedController:
 
         # 全局期望轨迹
         self.robotGlobalTraj = None
+        self.robotGLobalLen = None
 
         # 安全系数
         self.lambda_ = 0.5
@@ -73,19 +74,24 @@ class sharedController:
         self.Qh = np.zeros((3*self.localLen, 3*self.localLen))
 
         for i in range(self.localLen):
-            phi[(i*3+1):(3*i+3), :] = phi_row
-            self.Qr[(i*3+1):(3*i+3), (i*3+1):(3*i+3)] = Qii_r
-            self.Qh[(i*3+1):(3*i+3), (i*3+1):(3*i+3)] = Qii_h
+            phi[(i*3):(3*i+3), :] = phi_row
+            self.Qr[(i*3):(3*i+3), (i*3):(3*i+3)] = Qii_r
+            self.Qh[(i*3):(3*i+3), (i*3):(3*i+3)] = Qii_h
             theta_h_row = np.eye(6)
-            for j in range(i):
-                theta_h[(i*3+1):(3*i+3),(3*(i-j)+1):(3*(i-j)+3)] = np.dot(C, theta_h_row.dot(self.Bhd))
-                theta_r[(i*3+1):(3*i+3),(3*(i-j)+1):(3*(i-j)+3)] = np.dot(C, theta_h_row.dot(self.Brd))
+            for j in range(i+1):
+                theta_h[(i*3):(3*i+3),(3*(i-j)):(3*(i-j)+3)] = np.dot(C, theta_h_row.dot(self.Bhd))
+                theta_r[(i*3):(3*i+3),(3*(i-j)):(3*(i-j)+3)] = np.dot(C, theta_h_row.dot(self.Brd))
                 theta_h_row = theta_h_row.dot(self.Ad)
-            phi_row = phi_row.dot(self.Ad)
+            phi_row = np.dot(phi_row, self.Ad)
 
-        self.theta_rg = np.cstack((theta_h, theta_h))
-        self.theta_hg = np.cstack((theta_r, theta_r))
-        self.phi_g = np.cstack((phi, phi))
+        # print("theta_h", theta_h)
+        # print("theta_r", theta_r)
+        # print("phi", phi)
+
+        self.theta_rg = np.vstack((theta_h, theta_h))
+        self.theta_hg = np.vstack((theta_r, theta_r))
+        self.phi_g = np.vstack((phi, phi))
+
 
     def updateState(self, w):
         # 检查w是否为6*1的矩阵
@@ -105,6 +111,7 @@ class sharedController:
             print("Error: The length of robotGlobalTraj is less than localLen")
             return
 
+        self.robotGLobalLen = robotGlobalTraj.shape[1]
         self.robotGlobalTraj = robotGlobalTraj
 
     def gethumanLocalTraj(self, stickPos, endEffectorPos):
@@ -127,20 +134,28 @@ class sharedController:
             self.hunmanIntent = 0
             self.humanLocalTraj = np.zeros((3, self.localLen))
 
-        print("humanLocalTraj", self.humanLocalTraj.shape)
-
     def computeLambda(self, obstacles):
         pass
 
     def reshapeLocalTraj(self, localTraj):
-        x = localTraj[0, :]
-        y = localTraj[1, :]
-        z = localTraj[2, :]
+        # 检查localTraj是否为3*n的矩阵
+        if localTraj.shape[0] != 3:
+            print("Error: The shape of localTraj is not 3*n")
+            return
+        elif localTraj.shape[1] != self.localLen:
+            print("Error: The length of localTraj is not equal to localLen")
+            print("localTraj.shape[1]", localTraj.shape[1])
+            return
+
+        x = localTraj[0, :].reshape((self.localLen, 1))
+        y = localTraj[1, :].reshape((self.localLen, 1))
+        z = localTraj[2, :].reshape((self.localLen, 1))
         reshaped = np.vstack((x, y, z))
         return reshaped
     
     def getHumanIntent(self):
-        print("humanIntent", self.hunmanIntent)
+
+        # print("humanIntent", self.hunmanIntent)
 
         return self.hunmanIntent
     
@@ -148,15 +163,23 @@ class sharedController:
         pass
 
     def computeLocalTraj(self, robotGlobalTrajStartIndex):
-        if robotGlobalTrajStartIndex + self.localLen > self.robotGlobalTraj.shape[1]:
-            print("Error: Index out of the range of robotGlobalTraj")
+        # if robotGlobalTrajStartIndex + self.localLen > self.robotGlobalTraj.shape[1]:
+        #     print("Error: Index out of the range of robotGlobalTraj")
 
         # 当人类无意图时，返回机器人全局轨迹
         if self.hunmanIntent == 0:
             return self.robotGlobalTraj[:, robotGlobalTrajStartIndex]
 
         # 当人类有意图时，返回共享控制器计算的局部轨迹
-        self.robotLocalTraj = self.robotGlobalTraj[:, robotGlobalTrajStartIndex:(robotGlobalTrajStartIndex+self.localLen)]
+        # self.robotLocalTraj = self.robotGlobalTraj[:3, robotGlobalTrajStartIndex:(robotGlobalTrajStartIndex+self.localLen)]
+
+        # ----- 轨迹循环读取 -----
+        if robotGlobalTrajStartIndex + self.localLen > self.robotGLobalLen:
+            self.robotLocalTraj = self.robotGlobalTraj[:3, robotGlobalTrajStartIndex:]
+            self.robotLocalTraj = np.hstack((self.robotLocalTraj, self.robotGlobalTraj[:3, :(robotGlobalTrajStartIndex+self.localLen-self.robotGLobalLen)]))
+        else:
+            self.robotLocalTraj = self.robotGlobalTraj[:3, robotGlobalTrajStartIndex:(robotGlobalTrajStartIndex+self.localLen)]
+        # ----------------------
 
         X_dr = self.reshapeLocalTraj(self.robotLocalTraj)
         X_dh = self.reshapeLocalTraj(self.humanLocalTraj)
