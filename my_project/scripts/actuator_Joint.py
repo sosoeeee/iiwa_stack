@@ -18,6 +18,8 @@ cmdJointPosition = JointPosition()
 controllerFreq = 40                     # Hz
 
 def cmd_callBack(msg):
+    global currentJointPosition, cmdJointPosition
+
     cmd = msg.data
     [x, y, z, vx, vy, vz] = cmd.split(',')
     x = float(x)

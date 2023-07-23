@@ -81,3 +81,42 @@ def getCircleHuman(R, targetSpeed, controllerFreq, initX, initY, initZ):
     trajectory = np.vstack((x, y, z, vx, vy, vz))
 
     return trajectory
+
+
+def getLine(distance, targetSpeed, controllerFreq, initX, initY, initZ, Direction):
+    # 二维测试轨迹——直线
+    stepDis = targetSpeed/controllerFreq
+    num = int(distance/stepDis) # 直线段的点数
+    
+    if Direction == 'x':
+        x = np.linspace(initX, initX + distance, num)
+        y = np.ones(num) * initY
+    elif Direction == 'y':
+        x = np.ones(num) * initX
+        y = np.linspace(initY, initY + distance, num)
+
+    z = np.ones(len(x)) * initZ
+
+    # # 前向差分求速度
+    # speedMatrix = np.eye(len(z)) * (-1)
+    # for i in range(len(z)):
+    #     speedMatrix[i][(i - 1) % len(z)] = 1
+    # speedMatrix = speedMatrix.T
+
+    # vx = speedMatrix.dot(x) * controllerFreq
+    # vy = speedMatrix.dot(y) * controllerFreq
+    # vz = speedMatrix.dot(z) * controllerFreq
+
+    if Direction == 'x':
+        vx = np.ones(len(x)) * targetSpeed
+        vy = np.zeros(len(x))
+    elif Direction == 'y':
+        vx = np.zeros(len(x))
+        vy = np.ones(len(x)) * targetSpeed
+    
+    vz = np.zeros(len(x))
+
+    # 合并为一个6*len(theta)的矩阵
+    trajectory = np.vstack((x, y, z, vx, vy, vz))
+
+    return trajectory
