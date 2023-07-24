@@ -116,7 +116,7 @@ class sharedController:
 
     def gethumanLocalTraj(self, stickPos, endEffectorPos):
         distance = (stickPos[0]**2 + stickPos[1]**2)**0.5
-
+        print("distance", distance)
         deltaT = 1/self.controllerFreq
         t = np.arange(0, self.localLen*deltaT, deltaT)
         speedAmplitude = 0.5                    # 遥操作杆偏离中心的位置与机器人末端运动速度的比例系数
@@ -185,9 +185,9 @@ class sharedController:
         X_dh = self.reshapeLocalTraj(self.humanLocalTraj)
         X_d = np.vstack((X_dr, X_dh))
 
-        # 将状态变量与X_d写入txt
-        np.savetxt("w.txt", self.w)
-        np.savetxt("X_d.txt", X_d)
+        # # 将状态变量与X_d写入txt
+        # np.savetxt("w.txt", self.w)
+        # np.savetxt("X_d.txt", X_d)
 
         # 将Q_h和Q_r对角拼接
         Q = np.vstack((np.hstack((self.Qh * self.lambda_, np.zeros((3*self.localLen, 3*self.localLen)))), np.hstack((np.zeros((3*self.localLen, 3*self.localLen)), self.Qr * (1-self.lambda_)))))

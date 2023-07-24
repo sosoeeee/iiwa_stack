@@ -24,7 +24,7 @@ class Controller:
         self.pubMonitor_robot = rospy.Publisher('referRobotTrajectory', Float32MultiArray, queue_size=10)
         self.pubMonitor_human = rospy.Publisher('referHumanTrajectory', Float32MultiArray, queue_size=10)
         rospy.Subscriber('/iiwa/state/CartesianPose', CartesianPose, self.cartesianState_callBack, queue_size=1)
-        rospy.Subscriber("controllerSignal", String, self.stickSignal_callback)
+        rospy.Subscriber("stickSignal", String, self.stickSignal_callback)
         self.rate = rospy.Rate(self.controllerFreq)
 
         # 定义用于控制初始位姿的变量
@@ -142,7 +142,7 @@ class Controller:
 ##########################################################################
 controllerFreq = 20
 initX = -0.35
-initY = -0.35
+initY = -0.5
 initZ = 0.2
 
 # iniQ1 = 0.891
@@ -159,8 +159,9 @@ controller = Controller(controllerFreq)
 
 # 轨迹规划
 # 二维测试轨迹——圆形
-R = 0.1
-circleTrajectory = getCircle(R, 0.02, 20, initX, initY, initZ)
+R = 0.08
+Speed = 0.01
+circleTrajectory = getCircle(R, Speed, 20, initX, initY, initZ)
 x = circleTrajectory[0, :]
 y = circleTrajectory[1, :]
 z = circleTrajectory[2, :]
@@ -170,7 +171,7 @@ vz = circleTrajectory[5, :]
 controller.publishRobotTrajectory(circleTrajectory)
 
 # 修改生成人类轨迹的参数
-circleTrajectoryHuman = getCircleHuman(R, 0.02, 20, initX, initY, initZ)
+circleTrajectoryHuman = getCircleHuman(R, Speed, 20, initX, initY, initZ)
 controller.publishHumanTrajectory(circleTrajectoryHuman)
 
 # lineTrajectory = getLine(0.1, 0.02, 20, initX, initY, initZ, 'x')
@@ -211,12 +212,12 @@ while not rospy.is_shutdown():
     #     w_next = sharedcontroller.computeLocalTraj(i)   
 
     w_next = sharedcontroller.computeLocalTraj(i)
-    print("w_next: ", w_next)
+    # print("humanIntent: ", humanIntent)
 
-    # TrajectoryString = str(w_next[0, 0]) + ',' + str(w_next[1, 0]) + ',' + str(w_next[2, 0]) + ',' + str(w_next[3, 0]) + ',' + str(w_next[4, 0]) + ',' + str(w_next[5, 0])
+    TrajectoryString = str(w_next[0, 0]) + ',' + str(w_next[1, 0]) + ',' + str(w_next[2, 0]) + ',' + str(w_next[3, 0]) + ',' + str(w_next[4, 0]) + ',' + str(w_next[5, 0])
 
-    # controller.publishState(TrajectoryString)
+    controller.publishState(TrajectoryString)
     # print("TrajectoryString: ", TrajectoryString)
 
-    # i = (i + 1) % len(x)
+    i = (i + 1) % len(x)
     controller.rate.sleep()
