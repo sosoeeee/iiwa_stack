@@ -15,7 +15,7 @@ currentJointVelocity = np.zeros(7)
 
 firstFlag = True
 cmdJointPosition = JointPosition()
-controllerFreq = 40                     # Hz
+controllerFreq = 20                     # Hz
 
 def cmd_callBack(msg):
     global currentJointPosition, cmdJointPosition
@@ -31,11 +31,11 @@ def cmd_callBack(msg):
 
     Jcob = Jacobian(currentJointPosition)
     currentJointPositionVector = np.array(currentJointPosition).reshape(7, 1)
-    Jcob = Jcob[:3, :]
+    # Jcob = Jcob[:3, :]
     # 求解伪逆
     JcobInv = np.linalg.pinv(Jcob)
     # 计算关节角速度
-    qdot = JcobInv.dot(np.array([vx, vy, vz]).reshape(3, 1))
+    qdot = JcobInv.dot(np.array([vx, vy, vz, 0, 0, 0]).reshape(6, 1))
     # 计算关节角度
     q = currentJointPositionVector + qdot / controllerFreq
     print("q: ", q)

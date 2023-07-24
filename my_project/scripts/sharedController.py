@@ -166,10 +166,6 @@ class sharedController:
         # if robotGlobalTrajStartIndex + self.localLen > self.robotGlobalTraj.shape[1]:
         #     print("Error: Index out of the range of robotGlobalTraj")
 
-        # 当人类无意图时，返回机器人全局轨迹
-        if self.hunmanIntent == 0:
-            return self.robotGlobalTraj[:, robotGlobalTrajStartIndex]
-
         # 当人类有意图时，返回共享控制器计算的局部轨迹
         # self.robotLocalTraj = self.robotGlobalTraj[:3, robotGlobalTrajStartIndex:(robotGlobalTrajStartIndex+self.localLen)]
 
@@ -181,9 +177,17 @@ class sharedController:
             self.robotLocalTraj = self.robotGlobalTraj[:3, robotGlobalTrajStartIndex:(robotGlobalTrajStartIndex+self.localLen)]
         # ----------------------
 
+        # 当人类无意图时，人类局部轨迹与机器人局部轨迹相同
+        if self.hunmanIntent == 0:
+            self.humanLocalTraj = self.robotLocalTraj
+
         X_dr = self.reshapeLocalTraj(self.robotLocalTraj)
         X_dh = self.reshapeLocalTraj(self.humanLocalTraj)
         X_d = np.vstack((X_dr, X_dh))
+
+        # 将状态变量与X_d写入txt
+        np.savetxt("w.txt", self.w)
+        np.savetxt("X_d.txt", X_d)
 
         # 将Q_h和Q_r对角拼接
         Q = np.vstack((np.hstack((self.Qh * self.lambda_, np.zeros((3*self.localLen, 3*self.localLen)))), np.hstack((np.zeros((3*self.localLen, 3*self.localLen)), self.Qr * (1-self.lambda_)))))
