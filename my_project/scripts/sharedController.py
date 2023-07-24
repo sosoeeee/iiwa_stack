@@ -147,10 +147,10 @@ class sharedController:
             print("localTraj.shape[1]", localTraj.shape[1])
             return
 
-        x = localTraj[0, :].reshape((self.localLen, 1))
-        y = localTraj[1, :].reshape((self.localLen, 1))
-        z = localTraj[2, :].reshape((self.localLen, 1))
-        reshaped = np.vstack((x, y, z))
+        reshaped = np.zeros((3*self.localLen, 1))
+        for i in range(self.localLen):
+            reshaped[(i*3):(3*i+3), 0] = localTraj[:, i]
+
         return reshaped
     
     def getHumanIntent(self):
