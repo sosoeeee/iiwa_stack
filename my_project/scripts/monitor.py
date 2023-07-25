@@ -18,7 +18,7 @@ monitorRefreshTime = 50                # ms
 
 humanX = [0]
 humanY = [0]
-controllerFreq = 20                     # 控制频率
+controllerFreq = 10                    # 控制频率
 deltaT = 1/controllerFreq
 len = 50                                # 人生成的期望轨迹长度
 t = np.arange(0, len*deltaT, deltaT)

@@ -116,7 +116,7 @@ class sharedController:
 
     def gethumanLocalTraj(self, stickPos, endEffectorPos):
         distance = (stickPos[0]**2 + stickPos[1]**2)**0.5
-        print("distance", distance)
+        # print("distance", distance)
         deltaT = 1/self.controllerFreq
         t = np.arange(0, self.localLen*deltaT, deltaT)
         speedAmplitude = 0.5                    # 遥操作杆偏离中心的位置与机器人末端运动速度的比例系数

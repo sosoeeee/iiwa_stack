@@ -2,6 +2,7 @@
 
 import numpy as np
 import rospy
+import time
 from pynput import keyboard
 from iiwa_msgs.msg import JointPosition
 from iiwa_msgs.msg import JointVelocity
@@ -17,10 +18,14 @@ currentJointVelocity = np.zeros(7)
 firstFlag = True
 cmdJointPosition = JointPosition()
 cmdJointVelocity = JointVelocity()
-controllerFreq = 20                     # Hz
+controllerFreq = 10                     # Hz
+
+outTxt = None
+startTime = 0
+endTime = 0
 
 def cmd_callBack(msg):
-    global currentJointPosition, cmdJointPosition
+    global currentJointPosition, cmdJointPosition, outTxt
 
     cmd = msg.data
     [x, y, z, vx, vy, vz] = cmd.split(',')
@@ -40,7 +45,7 @@ def cmd_callBack(msg):
     qdot = JcobInv.dot(np.array([vx, vy, vz]).reshape(3, 1))
     # 计算关节角度
     q = currentJointPositionVector + qdot / controllerFreq
-    print("q: ", q)
+    print("q", q)
     # # 发布关节角度指令
     cmdJointPosition.position.a1 = q[0]
     cmdJointPosition.position.a2 = q[1]
@@ -52,7 +57,7 @@ def cmd_callBack(msg):
 
     pub.publish(cmdJointPosition)
 
-    # # 发布关节角速度指令
+    # # # 发布关节角速度指令
     # cmdJointVelocity.velocity.a1 = qdot[0]
     # cmdJointVelocity.velocity.a2 = qdot[1]
     # cmdJointVelocity.velocity.a3 = qdot[2]
@@ -63,12 +68,21 @@ def cmd_callBack(msg):
 
     # pubVelocity.publish(cmdJointVelocity)
 
+    # Debug
+    # outTemp = np.hstack((np.array(currentJointVelocity).reshape(1, 7), np.array(qdot[0]).reshape(1, 1)))
+    outTemp = np.hstack((currentJointPosition[0], q[0]))
+    outTxt = np.vstack((outTxt, outTemp)) if outTxt is not None else outTemp
 
+# 消息频率不稳定，在500Hz — 700Hz之间
 def state_callBack(msg):
     global currentJointPosition, currentJointVelocity
+    global startTime, endTime
     currentJointPosition = toArray(msg.position)
     currentJointVelocity = toArray(msg.velocity)
 
+def saveData():
+    global outTxt
+    np.savetxt("outData.txt", outTxt, fmt='%.4f')
 
 if __name__ == '__main__':
     try:
@@ -78,6 +92,9 @@ if __name__ == '__main__':
         rospy.Subscriber('/iiwa/state/JointPositionVelocity', JointPositionVelocity, state_callBack, queue_size=1)
         rospy.Subscriber('/nextState', String, cmd_callBack, queue_size=1)
 
+        rospy.on_shutdown(saveData)
+
         rospy.spin()
+
     except rospy.ROSInterruptException:
         pass

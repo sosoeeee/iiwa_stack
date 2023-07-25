@@ -12,6 +12,7 @@ import time
 from TrajectoryGenerator import *
 from sharedController import *
 
+
 ## 负责综合共享控制器、遥操作杆、机械臂状态信息，生成轨迹信息，并通过ROS发布给执行器
 class Controller:
     def __init__(self, controllerFreq):
@@ -140,7 +141,7 @@ class Controller:
 
 ## 控制器初始化
 ##########################################################################
-controllerFreq = 20
+controllerFreq = 10
 initX = -0.35
 initY = -0.5
 initZ = 0.2
@@ -160,8 +161,8 @@ controller = Controller(controllerFreq)
 # 轨迹规划
 # 二维测试轨迹——圆形
 R = 0.08
-Speed = 0.01
-circleTrajectory = getCircle(R, Speed, 20, initX, initY, initZ)
+Speed = 0.02
+circleTrajectory = getCircle(R, Speed, controllerFreq, initX, initY, initZ)
 x = circleTrajectory[0, :]
 y = circleTrajectory[1, :]
 z = circleTrajectory[2, :]
@@ -171,10 +172,10 @@ vz = circleTrajectory[5, :]
 controller.publishRobotTrajectory(circleTrajectory)
 
 # 修改生成人类轨迹的参数
-circleTrajectoryHuman = getCircleHuman(R, Speed, 20, initX, initY, initZ)
+circleTrajectoryHuman = getCircleHuman(R, Speed, controllerFreq, initX, initY, initZ)
 controller.publishHumanTrajectory(circleTrajectoryHuman)
 
-# lineTrajectory = getLine(0.1, 0.02, 20, initX, initY, initZ, 'x')
+# lineTrajectory = getLine(0.1, Speed, controllerFreq, initX, initY, initZ, 'x')
 # x = lineTrajectory[0, :]
 # y = lineTrajectory[1, :]
 # z = lineTrajectory[2, :]
@@ -182,11 +183,12 @@ controller.publishHumanTrajectory(circleTrajectoryHuman)
 # vy = lineTrajectory[4, :]
 # vz = lineTrajectory[5, :]
 # controller.publishRobotTrajectory(lineTrajectory)
+# print("lineTrajectory: ", lineTrajectory.shape)
 
 # 初始化机器人位姿
 # controller.setInitPos(initX + R, initY, initZ, initOrientationX, initOrientationY, initOrientationZ, initOrientationW)
 # controller.setInitPose(iniQ1, iniQ2, iniQ3, iniQ4, iniQ5, iniQ6, iniQ7)
-controller.setInitPos(initX+R, initY, initZ)
+controller.setInitPos(initX + R, initY, initZ)
 
 # 引入共享控制器
 sharedcontroller = sharedController(controllerFreq)
@@ -194,9 +196,7 @@ sharedcontroller.initialize(1, 0.1, 10000)
 sharedcontroller.setRobotGlobalTraj(circleTrajectory)
 
 i = 0
-while not rospy.is_shutdown():
-    # TrajectoryString = str(x[i]) + ',' + str(y[i]) + ',' + str(z[i]) + ',' + str(vx[i]) + ',' + str(vy[i]) + ',' + str(vz[i])
-    
+while not rospy.is_shutdown():    
     # 共享控制
     w = controller.getCurrentState()
     sharedcontroller.updateState(w)
@@ -220,4 +220,13 @@ while not rospy.is_shutdown():
     # print("TrajectoryString: ", TrajectoryString)
 
     i = (i + 1) % len(x)
+
+    # 开环控制
+    # TrajectoryString = str(x[i]) + ',' + str(y[i]) + ',' + str(z[i]) + ',' + str(vx[i]) + ',' + str(vy[i]) + ',' + str(vz[i])
+    # controller.publishState(TrajectoryString)
+    # i = i + 1
+    # if i == len(x):
+    #     break
+
+
     controller.rate.sleep()
