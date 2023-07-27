@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import numpy as np
+from RRT_PathPlanner import PathPlanner
+from TrajectoryGenerator import MinimumTrajPlanner
 
 class sharedController:
     def __init__(self, controllerFreq):
@@ -27,6 +29,9 @@ class sharedController:
         # 全局期望轨迹
         self.robotGlobalTraj = None
         self.robotGLobalLen = None
+
+        # 轨迹重规划长度
+        self.replanLen = 500
 
         # 安全系数
         self.lambda_ = 0.5
@@ -159,8 +164,31 @@ class sharedController:
 
         return self.hunmanIntent
     
-    def changeGlobalTraj(self, obstacles):
-        pass
+    def changeGlobalTraj(self, currentTrajIndex, obstacles, avrSpeed):
+        startPoint = self.robotGlobalTraj[:3, currentTrajIndex].reshape((3, 1))
+        endPoint = self.robotGlobalTraj[:3, currentTrajIndex+self.replanLen-1].reshape((3, 1))
+
+        pathPlanner = PathPlanner(startPoint, endPoint)
+        for obstacle in obstacles:
+            pathPlanner.addObstacle(obstacle['center'], obstacle['radius'])
+        
+        # 轨迹筛选
+        path = pathPlanner.RRT(False)
+
+        startVel = self.robotGlobalTraj[3:6, currentTrajIndex].reshape((3, 1))
+        endVel = self.robotGlobalTraj[3:6, currentTrajIndex+self.replanLen-1].reshape((3, 1))
+        # 由于轨迹信息中没有存储加速度，这里的加速度将不连续
+        startAcc = np.array([0, 0, 0]).reshape((3, 1))
+        endAcc = np.array([0, 0, 0]).reshape((3, 1)) 
+        miniJerkTrajPlanner = MinimumTrajPlanner(path, avrSpeed, self.controllerFreq, startVel, startAcc, endVel, endAcc, 3)
+        miniJerkTraj = miniJerkTrajPlanner.computeTraj()
+
+        # 改变轨迹
+        self.robotGlobalTraj[:, currentTrajIndex:(currentTrajIndex+self.replanLen)] = miniJerkTraj[:, :self.replanLen]
+
+        return self.robotGlobalTraj
+
+         
 
     def computeLocalTraj(self, robotGlobalTrajStartIndex):
         # if robotGlobalTrajStartIndex + self.localLen > self.robotGlobalTraj.shape[1]:

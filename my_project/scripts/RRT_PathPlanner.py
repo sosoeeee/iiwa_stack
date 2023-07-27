@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class PathPlaner:
+class PathPlanner:
     def __init__(self, startPoint, endPoint):
         # 起点和终点
         # 检查起点和终点是否为3*1

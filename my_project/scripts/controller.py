@@ -159,8 +159,8 @@ controller = Controller(controllerFreq)
 # 轨迹规划
 # 二维测试轨迹——圆形
 R = 0.08
-Speed = 0.02
-circleTrajectory = getCircle(R, Speed, controllerFreq, initX, initY, initZ)
+avrSpeed = 0.02
+circleTrajectory = getCircle(R, avrSpeed, controllerFreq, initX, initY, initZ)
 x = circleTrajectory[0, :]
 y = circleTrajectory[1, :]
 z = circleTrajectory[2, :]
@@ -170,7 +170,7 @@ vz = circleTrajectory[5, :]
 controller.publishRobotTrajectory(circleTrajectory)
 
 # 修改生成人类轨迹的参数
-circleTrajectoryHuman = getCircleHuman(R, Speed, controllerFreq, initX, initY, initZ)
+circleTrajectoryHuman = getCircleHuman(R, avrSpeed, controllerFreq, initX, initY, initZ)
 controller.publishHumanTrajectory(circleTrajectoryHuman)
 
 # lineTrajectory = getLine(0.1, Speed, controllerFreq, initX, initY, initZ, 'x')
@@ -204,10 +204,8 @@ while not rospy.is_shutdown():
     humanIntent = sharedcontroller.getHumanIntent()
 
     # if humanIntent == 2:
-    #     changedTrajectory = sharedcontroller.changeGlobalTraj()
-    #     controller.publishRobotTrajectory(changedTrajectory)
-    # else:
-    #     w_next = sharedcontroller.computeLocalTraj(i)   
+        # changedTrajectory = sharedcontroller.changeGlobalTraj(i, obstacles, avrSpeed)
+        # controller.publishRobotTrajectory(changedTrajectory)
 
     w_next = sharedcontroller.computeLocalTraj(i)
     # print("humanIntent: ", humanIntent)

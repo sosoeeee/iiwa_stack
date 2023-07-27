@@ -1,5 +1,5 @@
 import numpy as np
-from RRT_PathPlanner import PathPlaner
+from RRT_PathPlanner import PathPlanner
 from TrajectoryGenerator import MinimumTrajPlanner
 import matplotlib.pyplot as plt
 
@@ -10,10 +10,10 @@ start = time.time()
 startPoint = np.array([0, 0, 0]).reshape((3, 1))
 endPoint = np.array([1, 1, 0]).reshape((3, 1))
 
-pathPlaner = PathPlaner(startPoint, endPoint)
-pathPlaner.addObstacle(np.array([0.4, 0.4, 0]).reshape((3, 1)), 0.3)
+PathPlanner = PathPlanner(startPoint, endPoint)
+PathPlanner.addObstacle(np.array([0.4, 0.4, 0]).reshape((3, 1)), 0.3)
 
-path = pathPlaner.RRT(False)
+path = PathPlanner.RRT(False)
 
 end = time.time()
 
@@ -26,8 +26,8 @@ ax.scatter(startPoint[0], startPoint[1], startPoint[2], c='r', marker='o')
 ax.scatter(endPoint[0], endPoint[1], endPoint[2], c='r', marker='o')
 
 # 绘制障碍物
-for i in range(len(pathPlaner.obstacle)):
-    obstacle = pathPlaner.obstacle[i]
+for i in range(len(PathPlanner.obstacle)):
+    obstacle = PathPlanner.obstacle[i]
     ax.scatter(obstacle['center'][0], obstacle['center'][1], obstacle['center'][2], c='b', marker='o')
     u = np.linspace(0, 2 * np.pi, 100)
     v = np.linspace(0, np.pi, 100)
@@ -68,8 +68,8 @@ print("trajPlanner: ", end - start)
 # ax.scatter(endPoint[0], endPoint[1], endPoint[2], c='r', marker='o')
 #
 # # 绘制障碍物
-# for i in range(len(pathPlaner.obstacle)):
-#     obstacle = pathPlaner.obstacle[i]
+# for i in range(len(PathPlanner.obstacle)):
+#     obstacle = PathPlanner.obstacle[i]
 #     ax.scatter(obstacle['center'][0], obstacle['center'][1], obstacle['center'][2], c='b', marker='o')
 #     u = np.linspace(0, 2 * np.pi, 100)
 #     v = np.linspace(0, np.pi, 100)
