@@ -77,3 +77,6 @@ Status API Training Shop Blog About
 /config
 *.kdev_include_paths
 *.orig
+
+# __pycache__ directory
+__pycache__/

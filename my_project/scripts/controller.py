@@ -118,8 +118,6 @@ class Controller:
         # 机器人轨迹发布后，等待一段时间，确保可以绘制出轨迹
         rospy.sleep(1)
         self.pubMonitor_robot.publish(referTrajectory)
-
-        
     
     def publishHumanTrajectory(self, Trajectory):
         print("publish human trajectory")
