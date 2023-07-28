@@ -113,7 +113,7 @@ class PathPlanner:
 
             # 检测是否到达目标点
             if np.linalg.norm(newPoint - self.endPoint) < self.targetThreshold:
-                print("RRT search done")
+                # print("RRT search done")
                 startIndex = minIndex
                 break
 

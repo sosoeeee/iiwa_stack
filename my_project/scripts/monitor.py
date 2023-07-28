@@ -123,17 +123,17 @@ class Figure(QWidget):
         # 定时器间隔50ms，可以理解为 50ms 刷新一次数据
         self.timer.start(monitorRefreshTime)
 
-    def updatestick(self, point):
+    def updatestick(self, pointAndForce):
         # 按逗号分割字符串
-        point = point.split(',')
+        pointAndForce = pointAndForce.split(',')
         # 将字符串转换为浮点数
-        point = [float(i) for i in point]
+        pointAndForce = [float(i) for i in pointAndForce]
 
-        distance = (point[0]**2 + point[1]**2)**0.5
+        distance = (pointAndForce[0]**2 + pointAndForce[1]**2)**0.5
         if distance > 0.01:
             speed = distance * speedAmplitude  # max：2.5cm/s
-            cos = point[0] / distance
-            sin = point[1] / distance
+            cos = pointAndForce[0] / distance
+            sin = pointAndForce[1] / distance
             PosX = speed * cos * t * monitorAmplitude + (currentRobotX - initX) * monitorAmplitude
             PosY = speed * sin * t * monitorAmplitude + (currentRobotY - initY) * monitorAmplitude
             self.humanIntent.setData(PosX, PosY)

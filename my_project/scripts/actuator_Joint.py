@@ -70,8 +70,8 @@ def cmd_callBack(msg):
 
     # Debug
     # outTemp = np.hstack((np.array(currentJointVelocity).reshape(1, 7), np.array(qdot[0]).reshape(1, 1)))
-    outTemp = np.hstack((currentJointPosition[0], q[0]))
-    outTxt = np.vstack((outTxt, outTemp)) if outTxt is not None else outTemp
+    # outTemp = np.hstack((currentJointPosition[0], q[0]))
+    # outTxt = np.vstack((outTxt, outTemp)) if outTxt is not None else outTemp
 
 # 消息频率不稳定，在500Hz — 700Hz之间
 def state_callBack(msg):
@@ -92,7 +92,7 @@ if __name__ == '__main__':
         rospy.Subscriber('/iiwa/state/JointPositionVelocity', JointPositionVelocity, state_callBack, queue_size=1)
         rospy.Subscriber('/nextState', String, cmd_callBack, queue_size=1)
 
-        rospy.on_shutdown(saveData)
+        # rospy.on_shutdown(saveData)
 
         rospy.spin()
 

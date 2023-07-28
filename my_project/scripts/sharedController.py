@@ -30,9 +30,6 @@ class sharedController:
         self.robotGlobalTraj = None
         self.robotGLobalLen = None
 
-        # 轨迹重规划长度
-        self.replanLen = 500
-
         # 安全系数
         self.lambda_ = 0.5
 
@@ -48,6 +45,12 @@ class sharedController:
         # 1: 有微小意图
         # 2: 有明显意图
         self.hunmanIntent = 0
+
+        # 轨迹重规划长度
+        self.replanLen = 100
+        self.R = None
+        self.replanPathNum = 10 # 备选重规划轨迹数量
+        self.alpha = 100 # 重规划轨迹优化时人类意图的权重
     
     def initialize(self, weight_r, weight_h, weight_error):
         # 机械臂状态空间模型建立
@@ -97,6 +100,20 @@ class sharedController:
         self.theta_hg = np.vstack((theta_r, theta_r))
         self.phi_g = np.vstack((phi, phi))
 
+        # 初始化重规划参数
+        lenReplanA = self.replanLen
+        replanA = np.zeros((lenReplanA + 3, lenReplanA))
+        for i in range(1, lenReplanA + 3):
+            for j in range(1, lenReplanA):
+                if i == j:
+                    replanA[i-1, j-1] = 1
+                elif i == j + 1:
+                    replanA[i-1, j-1] = -3
+                elif i == j + 2:
+                    replanA[i-1, j-1] = 3
+                elif i == j + 3:
+                    replanA[i-1, j-1] = -1
+        self.R = replanA.T.dot(replanA)
 
     def updateState(self, w):
         # 检查w是否为6*1的矩阵
@@ -119,12 +136,16 @@ class sharedController:
         self.robotGLobalLen = robotGlobalTraj.shape[1]
         self.robotGlobalTraj = robotGlobalTraj
 
-    def gethumanLocalTraj(self, stickPos, endEffectorPos):
-        distance = (stickPos[0]**2 + stickPos[1]**2)**0.5
+    def gethumanLocalTraj(self, stickPos, stickForce, endEffectorPos):
+
+        distance = (stickPos[0]**2 + stickPos[1]**2)**0.5 ## 只考虑二维情况
         # print("distance", distance)
         deltaT = 1/self.controllerFreq
         t = np.arange(0, self.localLen*deltaT, deltaT)
         speedAmplitude = 0.5                    # 遥操作杆偏离中心的位置与机器人末端运动速度的比例系数
+
+        force = (stickForce[0]**2 + stickForce[1]**2)**0.5 ## 只考虑二维情况
+        # print("force", force)
 
         if distance > 0.01:
             speed = distance * speedAmplitude  # max：2.5cm/s
@@ -133,8 +154,13 @@ class sharedController:
             PosX = speed * cos * t + endEffectorPos[0]
             PosY = speed * sin * t + endEffectorPos[1]
             PosZ = np.ones(len(t)) * endEffectorPos[2]
-            self.hunmanIntent = 1
             self.humanLocalTraj = np.vstack((PosX, PosY, PosZ))
+
+            if force > 2.5:
+                self.hunmanIntent = 2
+            else:
+                self.hunmanIntent = 1
+
         else:
             self.hunmanIntent = 0
             self.humanLocalTraj = np.zeros((3, self.localLen))
@@ -164,31 +190,86 @@ class sharedController:
 
         return self.hunmanIntent
     
-    def changeGlobalTraj(self, currentTrajIndex, obstacles, avrSpeed):
+    def changeGlobalTraj(self, currentTrajIndex, humanForce, obstacles, avrSpeed):
         startPoint = self.robotGlobalTraj[:3, currentTrajIndex].reshape((3, 1))
-        endPoint = self.robotGlobalTraj[:3, currentTrajIndex+self.replanLen-1].reshape((3, 1))
+        # endPoint = self.robotGlobalTraj[:3, currentTrajIndex+self.replanLen-1].reshape((3, 1))
+
+        # ----- 轨迹循环读取 -----
+        if currentTrajIndex + self.replanLen > self.robotGLobalLen:
+            endPoint = self.robotGlobalTraj[:3, currentTrajIndex+self.replanLen-self.robotGLobalLen-1].reshape((3, 1))
+        else:
+            endPoint = self.robotGlobalTraj[:3, currentTrajIndex+self.replanLen-1].reshape((3, 1))
+        # ----- 轨迹循环读取 -----
 
         pathPlanner = PathPlanner(startPoint, endPoint)
         for obstacle in obstacles:
             pathPlanner.addObstacle(obstacle['center'], obstacle['radius'])
         
-        # 轨迹筛选
-        path = pathPlanner.RRT(False)
+        trajSet = []
 
-        startVel = self.robotGlobalTraj[3:6, currentTrajIndex].reshape((3, 1))
-        endVel = self.robotGlobalTraj[3:6, currentTrajIndex+self.replanLen-1].reshape((3, 1))
-        # 由于轨迹信息中没有存储加速度，这里的加速度将不连续
-        startAcc = np.array([0, 0, 0]).reshape((3, 1))
-        endAcc = np.array([0, 0, 0]).reshape((3, 1)) 
-        miniJerkTrajPlanner = MinimumTrajPlanner(path, avrSpeed, self.controllerFreq, startVel, startAcc, endVel, endAcc, 3)
-        miniJerkTraj = miniJerkTrajPlanner.computeTraj()
+        for i in range(self.replanPathNum):
+            # 轨迹筛选
+            path = pathPlanner.RRT(False)
+
+            startVel = self.robotGlobalTraj[3:6, currentTrajIndex].reshape((3, 1))
+            # endVel = self.robotGlobalTraj[3:6, currentTrajIndex+self.replanLen-1].reshape((3, 1))
+
+            # ----- 轨迹循环读取 -----
+            if currentTrajIndex + self.replanLen > self.robotGLobalLen:
+                endVel = self.robotGlobalTraj[3:6, currentTrajIndex+self.replanLen-self.robotGLobalLen-1].reshape((3, 1))
+            else:
+                endVel = self.robotGlobalTraj[3:6, currentTrajIndex+self.replanLen-1].reshape((3, 1))
+            # ----- 轨迹循环读取 -----
+
+            # 由于轨迹信息中没有存储加速度，这里的加速度将不连续
+            startAcc = np.array([0, 0, 0]).reshape((3, 1))
+            endAcc = np.array([0, 0, 0]).reshape((3, 1)) 
+            miniJerkTrajPlanner = MinimumTrajPlanner(path, avrSpeed, self.controllerFreq, startVel, startAcc, endVel, endAcc, 3)
+            miniJerkTraj = miniJerkTrajPlanner.computeTraj()
+
+            # 轨迹抽样（保证了更新的局部轨迹与原轨迹在时间上的一致性，但是牺牲了轨迹的平均速度期望）
+            index = np.arange(0, self.replanLen, 1) * (miniJerkTraj.shape[1] / self.replanLen)
+            miniJerkTrajSampled = np.zeros((6, self.replanLen))
+            for j in range(self.replanLen):
+                miniJerkTrajSampled[:, j] = miniJerkTraj[:, int(index[j])]
+            
+            if miniJerkTrajSampled.shape != (6, self.replanLen):
+                raise Exception("Error: The shape of miniJerkTrajSampled is wrong")
+
+            trajSet.append(miniJerkTrajSampled)
+        
+        originTrajPosition = self.robotGlobalTraj[:3, currentTrajIndex:(currentTrajIndex+self.replanLen)]
+        humanForceVector = np.ones((3, self.replanLen))
+        humanForceVector[0, :] = humanForce[0]
+        humanForceVector[1, :] = humanForce[1]
+        humanForceVector[2, :] = 0 ## 只考虑二维情况
+
+        # 计算每条备选轨迹的能量
+        energySet = []
+        for i in range(self.replanPathNum):
+            Ex = 1/(2*self.alpha) * trajSet[i][0, :].dot(self.R.dot(trajSet[i][0, :].T)) + humanForceVector[0, :].dot(trajSet[i][0, :].T) - 1/self.alpha * originTrajPosition[0, :].dot(self.R.dot(trajSet[i][0, :].T))
+            Ey = 1/(2*self.alpha) * trajSet[i][1, :].dot(self.R.dot(trajSet[i][1, :].T)) + humanForceVector[1, :].dot(trajSet[i][1, :].T) - 1/self.alpha * originTrajPosition[1, :].dot(self.R.dot(trajSet[i][1, :].T))
+            Ez = 1/(2*self.alpha) * trajSet[i][2, :].dot(self.R.dot(trajSet[i][2, :].T)) + humanForceVector[2, :].dot(trajSet[i][2, :].T) - 1/self.alpha * originTrajPosition[2, :].dot(self.R.dot(trajSet[i][2, :].T))
+
+            energySet.append(Ex + Ey + Ez)
+        # 最小能量对应的轨迹
+        miniEnergyIndex = energySet.index(min(energySet))
+
+        if trajSet[miniEnergyIndex].shape != (6, self.replanLen):
+            raise Exception("Error: The shape of miniEnergyTraj is wrong")
 
         # 改变轨迹
-        self.robotGlobalTraj[:, currentTrajIndex:(currentTrajIndex+self.replanLen)] = miniJerkTraj[:, :self.replanLen]
+        # self.robotGlobalTraj[:, currentTrajIndex:(currentTrajIndex+self.replanLen)] = trajSet[miniEnergyIndex][:, :self.replanLen]
+
+        # ----- 轨迹循环写入 -----
+        if currentTrajIndex + self.replanLen > self.robotGLobalLen:
+            self.robotGlobalTraj[:, currentTrajIndex:] = trajSet[miniEnergyIndex][:, :self.robotGLobalLen-currentTrajIndex]
+            self.robotGlobalTraj[:, :(currentTrajIndex+self.replanLen-self.robotGLobalLen)] = trajSet[miniEnergyIndex][:, self.robotGLobalLen-currentTrajIndex:]
+        else:
+            self.robotGlobalTraj[:, currentTrajIndex:(currentTrajIndex+self.replanLen)] = trajSet[miniEnergyIndex][:, :self.replanLen]
+        # ----------------------
 
         return self.robotGlobalTraj
-
-         
 
     def computeLocalTraj(self, robotGlobalTrajStartIndex):
         # if robotGlobalTrajStartIndex + self.localLen > self.robotGlobalTraj.shape[1]:

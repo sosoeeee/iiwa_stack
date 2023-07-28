@@ -42,6 +42,7 @@ class Controller:
 
         # 定义用于遥操作杆的变量
         self.stickPos = np.zeros((3, 1))
+        self.stickForce = np.zeros((3, 1))
 
     def setInitPose(self, q1, q2, q3, q4, q5, q6, q7):
         while self.firstFlag:
@@ -76,10 +77,14 @@ class Controller:
         print("initialization of pose is done")
     
     def stickSignal_callback(self, msg):
-        point = msg.data.split(',')
-        self.stickPos[0, 0] = float(point[0])
-        self.stickPos[1, 0] = float(point[1])
-        self.stickPos[2, 0] = float(point[2])
+        posAndForce = msg.data.split(',')
+        self.stickPos[0, 0] = float(posAndForce[0])
+        self.stickPos[1, 0] = float(posAndForce[1])
+        self.stickPos[2, 0] = float(posAndForce[2])
+
+        self.stickForce[0, 0] = float(posAndForce[3])
+        self.stickForce[1, 0] = float(posAndForce[4])
+        self.stickForce[2, 0] = float(posAndForce[5])
 
     # 笛卡尔空间状态回调函数
     def cartesianState_callBack(self, msg):
@@ -135,6 +140,9 @@ class Controller:
     
     def getStickPos(self):
         return self.stickPos
+
+    def getStickForce(self):
+        return self.stickForce
     
 
 ## 控制器初始化
@@ -159,7 +167,7 @@ controller = Controller(controllerFreq)
 # 轨迹规划
 # 二维测试轨迹——圆形
 R = 0.08
-avrSpeed = 0.02
+avrSpeed = 0.01
 circleTrajectory = getCircle(R, avrSpeed, controllerFreq, initX, initY, initZ)
 x = circleTrajectory[0, :]
 y = circleTrajectory[1, :]
@@ -197,15 +205,25 @@ i = 0
 while not rospy.is_shutdown():    
     # 共享控制
     w = controller.getCurrentState()
+    stickPos = controller.getStickPos()
+    stickForce = controller.getStickForce()
+    obstacles = {}
+
     sharedcontroller.updateState(w)
     endEffectorPos = w[0:3, 0]
-    stickPos = controller.getStickPos()
-    sharedcontroller.gethumanLocalTraj(stickPos, endEffectorPos)
+
+    sharedcontroller.gethumanLocalTraj(stickPos, stickForce, endEffectorPos)
     humanIntent = sharedcontroller.getHumanIntent()
 
-    # if humanIntent == 2:
-        # changedTrajectory = sharedcontroller.changeGlobalTraj(i, obstacles, avrSpeed)
-        # controller.publishRobotTrajectory(changedTrajectory)
+    if humanIntent == 2:
+        print("wait for trajectory replanning")
+        startTime = time.time()
+
+        changedTrajectory = sharedcontroller.changeGlobalTraj(i, stickForce, obstacles, avrSpeed)
+        controller.publishRobotTrajectory(changedTrajectory)
+        
+        endTime = time.time()
+        print("trajectory replanning is done, time cost: ", endTime - startTime)
 
     w_next = sharedcontroller.computeLocalTraj(i)
     # print("humanIntent: ", humanIntent)
