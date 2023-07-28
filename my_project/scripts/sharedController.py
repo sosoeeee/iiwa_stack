@@ -203,7 +203,8 @@ class sharedController:
 
         pathPlanner = PathPlanner(startPoint, endPoint)
         for obstacle in obstacles:
-            pathPlanner.addObstacle(obstacle['center'], obstacle['radius'])
+            if obstacle['state'] == 1:
+                pathPlanner.addObstacle(obstacle['center'], obstacle['radius'])
         
         trajSet = []
 

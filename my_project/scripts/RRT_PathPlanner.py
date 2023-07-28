@@ -21,7 +21,7 @@ class PathPlanner:
         # 目标阈值
         self.targetThreshold = 0.01
         # 搜索空间尺寸
-        self.searchSpace = np.array([[-1, 1], [-1, 1], [0, 0]])  # 二维运动z轴方向搜索空间为0
+        self.searchSpace = np.array([[-1, 1], [-1, 1], [0, 0]])  # 二维运动z轴方向搜索空间为0 ## 只考虑二维情况
         self.searchSpace = self.searchSpace.reshape((3, 2))
         # 贪婪搜索概率
         self.greedyProb = 0.3
