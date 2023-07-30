@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
+import math
 from RRT_PathPlanner import PathPlanner
 from TrajectoryGenerator import MinimumTrajPlanner
 
@@ -40,11 +41,12 @@ class sharedController:
         self.theta_hg = None
         self.phi_g = None
 
-        # 人类意图大小
+        # 根据人类控制力区分人类意图大小
         # 0：无意图
         # 1: 有微小意图
         # 2: 有明显意图
         self.hunmanIntent = 0
+        self.thresholdForce = 2.5
 
         # 轨迹重规划长度
         self.replanLen = 100
@@ -136,7 +138,8 @@ class sharedController:
         self.robotGLobalLen = robotGlobalTraj.shape[1]
         self.robotGlobalTraj = robotGlobalTraj
 
-    def gethumanLocalTraj(self, stickPos, stickForce, endEffectorPos):
+    def gethumanLocalTraj(self, stickPos, stickForce):
+        endEffectorPos = self.w[0:3]
 
         distance = (stickPos[0]**2 + stickPos[1]**2)**0.5 ## 只考虑二维情况
         # print("distance", distance)
@@ -156,7 +159,7 @@ class sharedController:
             PosZ = np.ones(len(t)) * endEffectorPos[2]
             self.humanLocalTraj = np.vstack((PosX, PosY, PosZ))
 
-            if force > 2.5:
+            if force > self.thresholdForce:
                 self.hunmanIntent = 2
             else:
                 self.hunmanIntent = 1
@@ -165,8 +168,51 @@ class sharedController:
             self.hunmanIntent = 0
             self.humanLocalTraj = np.zeros((3, self.localLen))
 
-    def computeLambda(self, obstacles):
-        pass
+    def computeLambda(self, obstacles, currentTrajIndex):
+        endEffectorPos = self.w[0:3].reshape((3, 1))
+        desiredPos = self.robotGlobalTraj[0:3, currentTrajIndex].reshape((3, 1))
+
+        # 将Obstacles转换为障碍物点集
+        obstaclePoints = None
+        for obstacle in obstacles:
+            if obstacle['state'] == 1:
+                obstaclePos = obstacle['pos']
+                obstacleRadius = obstacle['radius']
+                
+                distanceStep = 0.001
+                # 生成球面的点
+                phi = np.arange(0, np.pi, distanceStep/obstacleRadius)
+                for phi_ in phi:
+                    radius = obstacleRadius * np.sin(phi_)
+                    theta = np.arange(0, 2*np.pi, distanceStep/radius)
+                    x = radius * np.cos(theta) + obstaclePos[0]
+                    y = radius * np.sin(theta) + obstaclePos[1]
+                    z = np.ones(len(theta)) * obstacleRadius * np.cos(phi_) + obstaclePos[2]
+                    obstaclePoints_ = np.vstack((x, y, z))
+                    if obstaclePoints is None:
+                        obstaclePoints = obstaclePoints_
+                    else:
+                        obstaclePoints = np.hstack((obstaclePoints, obstaclePoints_))
+        
+        # 没有障碍物
+        if obstaclePoints is None:
+            d_res = 1
+        
+        d_res = min(np.linalg.norm(desiredPos - obstaclePoints, axis=0))
+        d = np.linalg.norm(endEffectorPos - desiredPos)
+        d_max = min(d, d_res)
+
+        a1_ = 0.97
+        a2_ = 0.25
+        mu_ = 0.15
+        eta_ = 0.000001
+
+        d_sat = (a1_ * d_res) / (1 + eta_ * math.exp(-mu_ * (d_max - a2_ * d_res))) ** (1 /eta_)
+
+        self.lambda_ = np.sqrt(d_res**2 - d_sat**2) / d_res
+
+        # debug
+        print("lambda_", self.lambda_)
 
     def reshapeLocalTraj(self, localTraj):
         # 检查localTraj是否为3*n的矩阵
@@ -190,6 +236,7 @@ class sharedController:
 
         return self.hunmanIntent
     
+    # 由于要求局部重规划轨迹长度不变，会进行抽样操作，所以此处的avrspeed变量意义不大，只要足够小就可以
     def changeGlobalTraj(self, currentTrajIndex, humanForce, obstacles, avrSpeed):
         startPoint = self.robotGlobalTraj[:3, currentTrajIndex].reshape((3, 1))
         # endPoint = self.robotGlobalTraj[:3, currentTrajIndex+self.replanLen-1].reshape((3, 1))

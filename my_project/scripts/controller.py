@@ -272,15 +272,17 @@ sharedcontroller.setRobotGlobalTraj(circleTrajectory)
 i = 0
 while not rospy.is_shutdown():    
     # 共享控制
+    # 获取其他模块的信息
     w = controller.getCurrentState()
     stickPos = controller.getStickPos()
     stickForce = controller.getStickForce()
     obstacles = controller.getObstacles()
 
+    # 更新共享控制器内部阻抗模型的状态变量
     sharedcontroller.updateState(w)
-    endEffectorPos = w[0:3, 0]
 
-    sharedcontroller.gethumanLocalTraj(stickPos, stickForce, endEffectorPos)
+    sharedcontroller.computeLambda(obstacles, i)
+    sharedcontroller.gethumanLocalTraj(stickPos, stickForce)
     humanIntent = sharedcontroller.getHumanIntent()
 
     # 可以考虑减小轨迹重规划的频率
