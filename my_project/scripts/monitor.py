@@ -26,9 +26,9 @@ speedAmplitude = 0.5                    # 遥操作杆偏离中心的位置与�
 
 robotX = [0] * monitorLen
 robotY = [0] * monitorLen
-initX = -0.35
-initY = -0.5
-initZ = 0.2
+initX = -0.41
+initY = 0.15
+initZ = 0.18
 index = 0
 currentRobotX = 0
 currentRobotY = 0
@@ -87,7 +87,7 @@ class ObstacleListenerThread(QtCore.QThread):
     dataSignal = QtCore.pyqtSignal(str)
 
     def run(self):
-        rospy.Subscriber("Obstacles", String, self.callback)
+        rospy.Subscriber("Obstacles", String, self.callback, queue_size=10)
         rospy.spin()
     
     def callback(self, msg):
@@ -96,17 +96,25 @@ class ObstacleListenerThread(QtCore.QThread):
 class Figure(QWidget):
     def __init__(self):
         super().__init__()
+        # 添加 PlotWidget 控件
+        self.plotWidget_ted = PlotWidget(self)
+
+        # 设置 PlotWidget 控件的坐标轴范围
+        xmin = -600
+        xmax = 600
+        ymin = -2000
+        ymax = 100
+        self.plotWidget_ted.setXRange(xmin, xmax)
+        self.plotWidget_ted.setYRange(ymin, ymax)
+        # 设置坐标轴分度一致
+        self.plotWidget_ted.setAspectLocked(True)
         # 设置下尺寸
         self.length = 800
         self.resize(self.length, self.length)
-        # 添加 PlotWidget 控件
-        self.plotWidget_ted = PlotWidget(self)
         # 设置该控件尺寸和相对位置
         self.plotWidget_ted.setGeometry(QtCore.QRect(25, 25, self.length - 50, self.length - 50))
-        # 设置 PlotWidget 控件的坐标轴范围
-        self.plotWidget_ted.setXRange(-600, 600)
-        self.plotWidget_ted.setYRange(-600, 600)
-
+                
+        # 添加图像
         self.humanIntent = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='w', name="mode1")
         self.robotPosition = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='r', name="mode2")
         self.robotTrajectory = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='b', name="mode3")
@@ -160,11 +168,12 @@ class Figure(QWidget):
                 'trajectory': self.getCircleTrajectory(x, y, radius)
             })
         else:
-            for i in range(len(self.obstaclesSet)):
-                if np.linalg.norm(np.array([x, y, z]).reshape((3, 1)) - self.obstaclesSet[i]['center']) < 0.03:
-                    self.obstaclesSet[i]['trajectory'] = self.getCircleTrajectory(x, y, radius)
-                    update = True
+            for obstacle in self.obstaclesSet:
+                if np.linalg.norm(np.array([x, y, z]).reshape((3, 1)) - obstacle['center']) < 0.03:
+                    obstacle['trajectory'] = self.getCircleTrajectory(x, y, radius)
+                    update = True # 旧有障碍物发生移动
                     break
+            # 新障碍物
             if update is False:
                 self.obstaclesSet.append({
                     'center': np.array([x, y, z]).reshape((3, 1)),

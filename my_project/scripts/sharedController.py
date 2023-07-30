@@ -176,7 +176,7 @@ class sharedController:
         obstaclePoints = None
         for obstacle in obstacles:
             if obstacle['state'] == 1:
-                obstaclePos = obstacle['pos']
+                obstaclePos = obstacle['center']
                 obstacleRadius = obstacle['radius']
                 
                 distanceStep = 0.001

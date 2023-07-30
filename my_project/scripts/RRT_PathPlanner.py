@@ -21,13 +21,13 @@ class PathPlanner:
         # 目标阈值
         self.targetThreshold = 0.01
         # 搜索空间尺寸
-        self.searchSpace = np.array([[-1, 1], [-1, 1], [0, 0]])  # 二维运动z轴方向搜索空间为0 ## 只考虑二维情况
+        self.searchSpace = np.array([[-0.3, 0.3], [-1, 1], [0, 0]])  # 二维运动z轴方向搜索空间为0 ## 只考虑二维情况
         self.searchSpace = self.searchSpace.reshape((3, 2))
         # 贪婪搜索概率
         self.greedyProb = 0.3
 
         # 路径的安全距离
-        self.safeDistance = 0.01
+        self.safeDistance = 0.03
 
         # 路径
         self.path = []
@@ -53,6 +53,17 @@ class PathPlanner:
         # 返回值：True——相交，False——不相交
 
         for i in range(len(self.obstacle)):
+            
+            # # DEBUG
+            # print("-------------------")
+            # print('obstacle %d' % i)
+            # print("point is")
+            # print(point)
+            # print("center is")
+            # print(self.obstacle[i]['center'])
+            # print("distance: ", np.linalg.norm(point - self.obstacle[i]['center']))
+            # print("radius", self.obstacle[i]['radius'])
+
             if np.linalg.norm(point - self.obstacle[i]['center']) < self.obstacle[i]['radius'] + self.safeDistance:
                 return True
 
@@ -155,5 +166,16 @@ class PathPlanner:
                 startIndex = endIndex
                 endIndex = self.path.shape[1] - 1
                 detectTimes = self.path.shape[1] - 1 - startIndex
+
+        # 设置点之间的最大距离，如果超过这个距离则插入新点
+        maxDis = self.step * 2
+        i = 0
+        while i < newPath.shape[1] - 1:
+            startPoint = newPath[:, i].reshape((3, 1))
+            endPoint = newPath[:, i + 1].reshape((3, 1))
+            if np.linalg.norm(startPoint - endPoint) > maxDis:
+                newPoint = startPoint + (endPoint - startPoint) / np.linalg.norm(endPoint - startPoint) * maxDis
+                newPath = np.hstack((newPath[:, :i + 1], newPoint, newPath[:, i + 1:]))
+            i += 1
 
         self.path = newPath
