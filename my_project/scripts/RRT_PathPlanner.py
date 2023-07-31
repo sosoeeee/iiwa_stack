@@ -2,7 +2,7 @@ import numpy as np
 
 
 class PathPlanner:
-    def __init__(self, startPoint, endPoint):
+    def __init__(self, startPoint, endPoint, searchSpace):
         # 起点和终点
         # 检查起点和终点是否为3*1
         if startPoint.shape != (3, 1) or endPoint.shape != (3, 1):
@@ -21,7 +21,8 @@ class PathPlanner:
         # 目标阈值
         self.targetThreshold = 0.01
         # 搜索空间尺寸
-        self.searchSpace = np.array([[-0.3, 0.3], [-1, 1], [0, 0]])  # 二维运动z轴方向搜索空间为0 ## 只考虑二维情况
+        self.searchSpace = np.array([[searchSpace[0, 0], searchSpace[0, 1]], [searchSpace[1, 0], searchSpace[1, 1]], [0, 0]]) # 二维运动z轴方向搜索空间为0 ## 只考虑二维情况
+        # self.searchSpace = np.array([[-0.26, 0.26], [-1, 1], [0, 0]])  # 二维运动z轴方向搜索空间为0 ## 只考虑二维情况
         self.searchSpace = self.searchSpace.reshape((3, 2))
         # 贪婪搜索概率
         self.greedyProb = 0.3
@@ -152,7 +153,7 @@ class PathPlanner:
         endIndex = self.path.shape[1] - 1
         detectTimes = self.path.shape[1] - 1
 
-        newPath = self.path[:, 0].reshape((3, 1))
+        greedyPath = self.path[:, 0].reshape((3, 1))
 
         while detectTimes > 0:
             detectTimes -= 1
@@ -162,20 +163,26 @@ class PathPlanner:
             if self.collisionDetection(startPoint, endPoint):
                 endIndex -= 1
             else:
-                newPath = np.hstack((newPath, endPoint))
+                greedyPath = np.hstack((greedyPath, endPoint))
                 startIndex = endIndex
                 endIndex = self.path.shape[1] - 1
                 detectTimes = self.path.shape[1] - 1 - startIndex
 
-        # 设置点之间的最大距离，如果超过这个距离则插入新点
-        maxDis = self.step * 2
-        i = 0
-        while i < newPath.shape[1] - 1:
-            startPoint = newPath[:, i].reshape((3, 1))
-            endPoint = newPath[:, i + 1].reshape((3, 1))
-            if np.linalg.norm(startPoint - endPoint) > maxDis:
-                newPoint = startPoint + (endPoint - startPoint) / np.linalg.norm(endPoint - startPoint) * maxDis
-                newPath = np.hstack((newPath[:, :i + 1], newPoint, newPath[:, i + 1:]))
-            i += 1
-
-        self.path = newPath
+        # 设置点之间的最大距离，如果超过这个距离则等分起始点和终止点之间的距离，同时保持路径点的顺序
+        extendPath = self.startPoint
+        maxDistance = self.step * 3
+        for i in range(greedyPath.shape[1] - 1):
+            startPoint = greedyPath[:, i].reshape((3, 1))
+            endPoint = greedyPath[:, i + 1].reshape((3, 1))
+            if np.linalg.norm(endPoint - startPoint) > maxDistance:
+                newPointNum = int(np.linalg.norm(endPoint - startPoint) / maxDistance)
+                newPointSet = startPoint + (endPoint - startPoint) / newPointNum
+                for j in range(1, newPointNum - 1):
+                    newPoint = startPoint + (endPoint - startPoint) / newPointNum * (j + 1)
+                    newPointSet = np.hstack((newPointSet, newPoint))
+                extendPath = np.hstack((extendPath, newPointSet, endPoint))
+            else:
+                extendPath = np.hstack((extendPath, endPoint))
+                
+        # self.path = greedyPath
+        self.path = extendPath

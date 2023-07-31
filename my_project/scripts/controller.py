@@ -61,7 +61,10 @@ class Controller:
         # 将障碍物从VICON坐标系转换到机器人坐标系
         self.cooridinateTransformX =  2.2289 + 0.1762
         self.cooridinateTransformY = -1.5596 + 0.4873
-        self.cooridinateTransformZ =  0.6921 - 0.2822 + 0.13
+        self.cooridinateTransformZ =  0.6921 - 0.2822 + 0.1
+        # 运动空间(运动空间为矩形，由两个顶点确定)
+        self.pos1 = None
+        self.pos2 = None
 
     # 根据订阅的VICON个数初始化障碍物个数
     def initObstacleSet(self, num):
@@ -109,6 +112,10 @@ class Controller:
             rospy.sleep(1)
 
         print("initialization of pose is done")
+    
+    def setMoveSpace(self, pos1, pos2):
+        self.pos1 = pos1
+        self.pos2 = pos2
     
     def stickSignal_callback(self, msg):
         posAndForce = msg.data.split(',')
@@ -249,6 +256,40 @@ class Controller:
         rospy.sleep(1)
         self.pubMonitor_human.publish(referTrajectory)
     
+    def getAllObstaclesPoints(self):
+        # 生成点集的步长
+        distanceStep = 0.01
+        # 获取长方体运动空间表面的点
+        if self.pos1 is None or self.pos2 is None:
+            raise Exception("move space is not set")
+            
+        cuboidPoints = getCuboidPoints(self.pos1, self.pos2, distanceStep * 3)
+        obstaclePoints = cuboidPoints
+        # obstaclePoints = None
+
+        # 将Obstacles转换为球面障碍物点集
+        for obstacle in self.ObstacleSet:
+            if obstacle['state'] == 1:
+                obstaclePos = obstacle['center']
+                obstacleRadius = obstacle['radius']
+                
+                if obstaclePoints is None:
+                    obstaclePoints = getSphericalPoints(obstaclePos, obstacleRadius, distanceStep)
+                else:
+                    obstaclePoints = np.hstack((obstaclePoints, getSphericalPoints(obstaclePos, obstacleRadius, distanceStep)))
+        
+        # DEBUG
+        # import matplotlib.pyplot as plt
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111, projection='3d')
+        # ax.set_xlabel('x')
+        # ax.set_ylabel('y')
+        # ax.set_zlabel('z')
+        # ax.scatter(obstaclePoints[0, :], obstaclePoints[1, :], obstaclePoints[2, :], c='r', marker='.')
+        # plt.show()
+
+        return obstaclePoints
+
     def getObstacles(self):
         return self.ObstacleSet
 
@@ -265,17 +306,22 @@ class Controller:
 ## 控制器初始化
 ##########################################################################
 controllerFreq = 10
-initX = -0.41
-initY = 0.15
-initZ = 0.18
+initX = -0.46015
+initY = 0.11484
+initZ = 0.20458
 
-# iniQ1 = -1.1733
-# iniQ2 = -1.0135
-# iniQ3 = 1.0357
-# iniQ4 = 1.9903
-# iniQ5 = -1.1415
-# iniQ6 = -0.8435
-# iniQ7 = -2.8886
+# 运动边界
+Xrange = [-0.26, 0.1]
+Yrange = [-1, 1]
+Zrange = [-1, 1]
+
+iniQ1 = -1.0912
+iniQ2 = -1.0999
+iniQ3 = 1.16505
+iniQ4 = 1.8945
+iniQ5 = -1.2382
+iniQ6 = -1.0227
+iniQ7 = -0.2546
 
 controller = Controller(controllerFreq)
 controller.initObstacleSet(3)
@@ -312,6 +358,11 @@ controller.initObstacleSet(3)
 
 # RRT规划
 avrSpeed = 0.01
+startPoint = np.array([initX, initY, initZ]).reshape((3, 1))
+endPoint = np.array([initX + 0.06, initY - 0.6, initZ]).reshape((3, 1))
+pathPLanner = PathPlanner(startPoint, endPoint, np.array([Xrange, Yrange, Zrange]))
+
+# 读取环境信息
 obstacles = controller.getObstacles()
 while True:
     state = 1
@@ -324,10 +375,6 @@ while True:
         print("wait for obstacles...")
         rospy.sleep(1)
     obstacles = controller.getObstacles()
-startPoint = np.array([initX, initY, initZ]).reshape((3, 1))
-endPoint = np.array([initX + 0.06, initY - 0.6, initZ]).reshape((3, 1))
-
-pathPLanner = PathPlanner(startPoint, endPoint)
 i = 0
 for obstacle in obstacles:
     pathPLanner.addObstacle(obstacle['center'], obstacle['radius'])
@@ -338,9 +385,12 @@ for obstacle in obstacles:
 
 print("start RRT path planning")
 path = pathPLanner.RRT(True)
+
+# 绘制路径规划的结果
 print(path.shape)
 controller.publishRobotTrajectory(path)
 rospy.sleep(3)
+
 print("RRT path planning is done")
 
 # 轨迹规划
@@ -358,53 +408,59 @@ print("trajectory planning is done")
 
 # 初始化机器人位姿
 # controller.setInitPos(initX + R, initY, initZ, initOrientationX, initOrientationY, initOrientationZ, initOrientationW)
-# controller.setInitPose(iniQ1, iniQ2, iniQ3, iniQ4, iniQ5, iniQ6, iniQ7)
+controller.setInitPose(iniQ1, iniQ2, iniQ3, iniQ4, iniQ5, iniQ6, iniQ7)
 controller.setInitPos(initX, initY, initZ)
+
+# 设置机器人运动边界
+pos1 = np.array([initX + Xrange[0], initY + Yrange[0], initZ + Zrange[0]]).reshape((3, 1))
+pos2 = np.array([initX + Xrange[1], initY + Yrange[1], initZ + Zrange[1]]).reshape((3, 1))
+controller.setMoveSpace(pos1, pos2)
 
 # 引入共享控制器
 sharedcontroller = sharedController(controllerFreq)
-sharedcontroller.initialize(1, 0.1, 10000)
+sharedcontroller.initialize(1, 10, 10000)
 sharedcontroller.setRobotGlobalTraj(traj)
 
 i = 0
 while not rospy.is_shutdown():    
-    # # 共享控制
-    # # 获取其他模块的信息
-    # w = controller.getCurrentState()
-    # stickPos = controller.getStickPos()
-    # stickForce = controller.getStickForce()
-    # obstacles = controller.getObstacles()
+    # 共享控制
+    # 获取其他模块的信息
+    w = controller.getCurrentState()
+    stickPos = controller.getStickPos()
+    stickForce = controller.getStickForce()
+    obstacles = controller.getObstacles()
 
-    # # 更新共享控制器内部阻抗模型的状态变量
-    # sharedcontroller.updateState(w)
+    # 更新共享控制器内部阻抗模型的状态变量
+    sharedcontroller.updateState(w)
 
-    # sharedcontroller.computeLambda(obstacles, i)
-    # sharedcontroller.gethumanLocalTraj(stickPos, stickForce)
-    # humanIntent = sharedcontroller.getHumanIntent()
+    sharedcontroller.computeLambda(controller.getAllObstaclesPoints(), i) # 计算SPI
+    sharedcontroller.gethumanLocalTraj(stickPos, stickForce)
+    humanIntent = sharedcontroller.getHumanIntent()
 
-    # # 可以考虑减小轨迹重规划的频率
-    # if humanIntent == 2:
-    #     print("wait for trajectory replanning")
-    #     startTime = time.time()
+    # 可以考虑减小轨迹重规划的频率, 慢10倍
+    # if i % 10 == 0:
+    #     if humanIntent == 2:
+    #         print("wait for trajectory replanning")
+    #         startTime = time.time()
 
-    #     changedTrajectory = sharedcontroller.changeGlobalTraj(i, stickForce, obstacles, avrSpeed)
-    #     controller.publishRobotTrajectory(changedTrajectory)
+    #         changedTrajectory = sharedcontroller.changeGlobalTraj(i, stickForce, obstacles, avrSpeed)
+    #         controller.publishRobotTrajectory(changedTrajectory)
 
-    #     endTime = time.time()
-    #     print("trajectory replanning is done, time cost: ", endTime - startTime)
+    #         endTime = time.time()
+    #         print("trajectory replanning is done, time cost: ", endTime - startTime)
 
-    # w_next = sharedcontroller.computeLocalTraj(i)
-    # # print("humanIntent: ", humanIntent)
+    w_next = sharedcontroller.computeLocalTraj(i)
+    # print("humanIntent: ", humanIntent)
 
-    # TrajectoryString = str(w_next[0, 0]) + ',' + str(w_next[1, 0]) + ',' + str(w_next[2, 0]) + ',' + str(w_next[3, 0]) + ',' + str(w_next[4, 0]) + ',' + str(w_next[5, 0])
+    TrajectoryString = str(w_next[0, 0]) + ',' + str(w_next[1, 0]) + ',' + str(w_next[2, 0]) + ',' + str(w_next[3, 0]) + ',' + str(w_next[4, 0]) + ',' + str(w_next[5, 0])
 
-    # controller.publishState(TrajectoryString)
-    # # print("TrajectoryString: ", TrajectoryString)
+    controller.publishState(TrajectoryString)
+    # print("TrajectoryString: ", TrajectoryString)
 
-    # # i = (i + 1) % len(traj.shape[1])
-    # i = i + 1
-    # if i == len(traj.shape[1]):
-    #     break
+    # i = (i + 1) % len(traj.shape[1])
+    i = i + 1
+    if i == traj.shape[1]:
+        break
 
     # 开环控制
     # TrajectoryString = str(x[i]) + ',' + str(y[i]) + ',' + str(z[i]) + ',' + str(vx[i]) + ',' + str(vy[i]) + ',' + str(vz[i])

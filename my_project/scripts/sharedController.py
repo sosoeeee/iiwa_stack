@@ -4,6 +4,7 @@ import numpy as np
 import math
 from RRT_PathPlanner import PathPlanner
 from TrajectoryGenerator import MinimumTrajPlanner
+from obstacleGenerator import *
 
 class sharedController:
     def __init__(self, controllerFreq):
@@ -168,36 +169,11 @@ class sharedController:
             self.hunmanIntent = 0
             self.humanLocalTraj = np.zeros((3, self.localLen))
 
-    def computeLambda(self, obstacles, currentTrajIndex):
+    def computeLambda(self, obstaclePoints, currentTrajIndex):
+        # obstaclePoints: 全部障碍物和运动边界的点集
         endEffectorPos = self.w[0:3].reshape((3, 1))
         desiredPos = self.robotGlobalTraj[0:3, currentTrajIndex].reshape((3, 1))
 
-        # 将Obstacles转换为障碍物点集
-        obstaclePoints = None
-        for obstacle in obstacles:
-            if obstacle['state'] == 1:
-                obstaclePos = obstacle['center']
-                obstacleRadius = obstacle['radius']
-                
-                distanceStep = 0.001
-                # 生成球面的点
-                phi = np.arange(0, np.pi, distanceStep/obstacleRadius)
-                for phi_ in phi:
-                    radius = obstacleRadius * np.sin(phi_)
-                    theta = np.arange(0, 2*np.pi, distanceStep/radius)
-                    x = radius * np.cos(theta) + obstaclePos[0]
-                    y = radius * np.sin(theta) + obstaclePos[1]
-                    z = np.ones(len(theta)) * obstacleRadius * np.cos(phi_) + obstaclePos[2]
-                    obstaclePoints_ = np.vstack((x, y, z))
-                    if obstaclePoints is None:
-                        obstaclePoints = obstaclePoints_
-                    else:
-                        obstaclePoints = np.hstack((obstaclePoints, obstaclePoints_))
-        
-        # 没有障碍物
-        if obstaclePoints is None:
-            d_res = 1
-        
         d_res = min(np.linalg.norm(desiredPos - obstaclePoints, axis=0))
         d = np.linalg.norm(endEffectorPos - desiredPos)
         d_max = min(d, d_res)
@@ -212,7 +188,11 @@ class sharedController:
         self.lambda_ = np.sqrt(d_res**2 - d_sat**2) / d_res
 
         # debug
+        # print("d_max", d_max)
+        print("d", d)
+        # print("d_res", d_res)
         print("lambda_", self.lambda_)
+        
 
     def reshapeLocalTraj(self, localTraj):
         # 检查localTraj是否为3*n的矩阵
@@ -248,7 +228,12 @@ class sharedController:
             endPoint = self.robotGlobalTraj[:3, currentTrajIndex+self.replanLen-1].reshape((3, 1))
         # ----- 轨迹循环读取 -----
 
-        pathPlanner = PathPlanner(startPoint, endPoint)
+        # 局部轨迹重规划的搜索空间
+        Xrange = [-0.5, 0.5]
+        Yrange = [-0.5, 0.5]
+        Zrange = [-0.5, 0.5]
+
+        pathPlanner = PathPlanner(startPoint, endPoint, np.array([Xrange, Yrange, Zrange]))
         for obstacle in obstacles:
             if obstacle['state'] == 1:
                 pathPlanner.addObstacle(obstacle['center'], obstacle['radius'])
@@ -340,7 +325,7 @@ class sharedController:
 
         X_dr = self.reshapeLocalTraj(self.robotLocalTraj)
         X_dh = self.reshapeLocalTraj(self.humanLocalTraj)
-        X_d = np.vstack((X_dr, X_dh))
+        X_d = np.vstack((X_dh, X_dr))
 
         # # 将状态变量与X_d写入txt
         # np.savetxt("w.txt", self.w)

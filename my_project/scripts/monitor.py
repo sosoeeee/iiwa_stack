@@ -26,9 +26,9 @@ speedAmplitude = 0.5                    # 遥操作杆偏离中心的位置与�
 
 robotX = [0] * monitorLen
 robotY = [0] * monitorLen
-initX = -0.41
-initY = 0.15
-initZ = 0.18
+initX = -0.46015
+initY = 0.11484
+initZ = 0.20458
 index = 0
 currentRobotX = 0
 currentRobotY = 0
@@ -77,10 +77,11 @@ class RobotListenerThread(QtCore.QThread):
         rospy.spin()
 
     def callback(self, msg):
-        global currentRobotX, currentRobotY
+        global currentRobotX, currentRobotY, currentRobotZ
         # rospy.loginfo(rospy.get_caller_id() + "I heard %s", msg.data)
         currentRobotX = msg.poseStamped.pose.position.x
         currentRobotY = msg.poseStamped.pose.position.y
+        currentRobotZ = msg.poseStamped.pose.position.z
 
 
 class ObstacleListenerThread(QtCore.QThread):
@@ -119,6 +120,7 @@ class Figure(QWidget):
         self.robotPosition = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='r', name="mode2")
         self.robotTrajectory = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='b', name="mode3")
         self.humanTrajectory = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='g', name="mode4")
+        self.obstacles = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='y', name="mode5")
 
         # Trajcetory 监听器
         self.trajectoryListener_thread = TrajectoryListenerThread()
@@ -149,6 +151,7 @@ class Figure(QWidget):
         self.timer.start(monitorRefreshTime)
 
     def updateObstacle(self, data):
+        global currentRobotZ
         # 按逗号分割字符串
         data = data.split(',')
         # 将字符串转换为浮点数
@@ -157,7 +160,10 @@ class Figure(QWidget):
         x = data[0]
         y = data[1]
         z = data[2]
-        radius = data[3]
+        sphereRadius = data[3]
+
+        dz = currentRobotZ - z
+        circleRadius = np.sqrt(sphereRadius**2 - dz**2)
 
         # 检查是否已经存在该障碍物，若存在则找到该障碍物并更新其轨迹
         update = False
@@ -165,26 +171,31 @@ class Figure(QWidget):
             self.obstaclesSet = []
             self.obstaclesSet.append({
                 'center': np.array([x, y, z]).reshape((3, 1)),
-                'trajectory': self.getCircleTrajectory(x, y, radius)
+                'trajectory': self.getCircleTrajectory(x, y, circleRadius)
             })
         else:
             for obstacle in self.obstaclesSet:
-                if np.linalg.norm(np.array([x, y, z]).reshape((3, 1)) - obstacle['center']) < 0.03:
-                    obstacle['trajectory'] = self.getCircleTrajectory(x, y, radius)
+                if np.linalg.norm(np.array([x, y, z]).reshape((3, 1)) - obstacle['center']) < 0.1:
+                    obstacle['trajectory'] = self.getCircleTrajectory(x, y, circleRadius)
                     update = True # 旧有障碍物发生移动
                     break
             # 新障碍物
             if update is False:
                 self.obstaclesSet.append({
                     'center': np.array([x, y, z]).reshape((3, 1)),
-                    'trajectory': self.getCircleTrajectory(x, y, radius)
+                    'trajectory': self.getCircleTrajectory(x, y, circleRadius)
                 })
         
         self.DrawObstacles()
 
     def DrawObstacles(self):
+        obstacleX = []
+        obsracleY = []
         for obstacle in self.obstaclesSet:
-            self.plotWidget_ted.plot(obstacle['trajectory'][0], obstacle['trajectory'][1], pen=None, symbol='o', symbolSize=1, symbolBrush='y')
+            obstacleX.extend(obstacle['trajectory'][0])
+            obsracleY.extend(obstacle['trajectory'][1])
+
+        self.obstacles.setData(obstacleX, obsracleY)
 
     def getCircleTrajectory(self, x, y, radius):
         # 生成圆形轨迹
@@ -227,8 +238,6 @@ class Figure(QWidget):
         data = dataDict['data']
         typeTraj = dataDict['type']
         
-        print(typeTraj)
-
         data = np.array(data)
         len = data.shape[0]
         data = data.reshape((3, int(len/3)))
