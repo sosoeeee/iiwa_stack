@@ -6,10 +6,11 @@ from RRT_PathPlanner import PathPlanner
 from TrajectoryGenerator import MinimumTrajPlanner
 from obstacleGenerator import *
 
+
 class sharedController:
     def __init__(self, controllerFreq):
         # 控制频率
-        self.controllerFreq = controllerFreq    # Hz
+        self.controllerFreq = controllerFreq  # Hz
 
         # 阻抗模型
         self.Md = 5 * np.eye(3)
@@ -52,9 +53,9 @@ class sharedController:
         # 轨迹重规划长度
         self.replanLen = 100
         self.R = None
-        self.replanPathNum = 10 # 备选重规划轨迹数量
-        self.alpha = 100 # 重规划轨迹优化时人类意图的权重
-    
+        self.replanPathNum = 10  # 备选重规划轨迹数量
+        self.alpha = 100  # 重规划轨迹优化时人类意图的权重
+
     def initialize(self, weight_r, weight_h, weight_error):
         # 机械臂状态空间模型建立
         Md_inv = np.linalg.inv(self.Md)
@@ -69,29 +70,29 @@ class sharedController:
         C[:, 0:3] = np.eye(3)
 
         # 离散化
-        T = 1/self.controllerFreq
-        self.Ad = np.eye(6) + A*T
-        self.Brd = Br*T
-        self.Bhd = Bh*T
+        T = 1 / self.controllerFreq
+        self.Ad = np.eye(6) + A * T
+        self.Brd = Br * T
+        self.Bhd = Bh * T
 
         # 控制器参数设置
-        phi = np.zeros((3*self.localLen, 6))
-        theta_h = np.zeros((3*self.localLen, 3*self.localLen))
-        theta_r = np.zeros((3*self.localLen, 3*self.localLen))
+        phi = np.zeros((3 * self.localLen, 6))
+        theta_h = np.zeros((3 * self.localLen, 3 * self.localLen))
+        theta_r = np.zeros((3 * self.localLen, 3 * self.localLen))
         phi_row = C.dot(self.Ad)
         Qii_r = np.eye(3) * weight_r * weight_error
         Qii_h = np.eye(3) * weight_h * weight_error
-        self.Qr = np.zeros((3*self.localLen, 3*self.localLen))
-        self.Qh = np.zeros((3*self.localLen, 3*self.localLen))
+        self.Qr = np.zeros((3 * self.localLen, 3 * self.localLen))
+        self.Qh = np.zeros((3 * self.localLen, 3 * self.localLen))
 
         for i in range(self.localLen):
-            phi[(i*3):(3*i+3), :] = phi_row
-            self.Qr[(i*3):(3*i+3), (i*3):(3*i+3)] = Qii_r
-            self.Qh[(i*3):(3*i+3), (i*3):(3*i+3)] = Qii_h
+            phi[(i * 3):(3 * i + 3), :] = phi_row
+            self.Qr[(i * 3):(3 * i + 3), (i * 3):(3 * i + 3)] = Qii_r
+            self.Qh[(i * 3):(3 * i + 3), (i * 3):(3 * i + 3)] = Qii_h
             theta_h_row = np.eye(6)
-            for j in range(i+1):
-                theta_h[(i*3):(3*i+3),(3*(i-j)):(3*(i-j)+3)] = np.dot(C, theta_h_row.dot(self.Bhd))
-                theta_r[(i*3):(3*i+3),(3*(i-j)):(3*(i-j)+3)] = np.dot(C, theta_h_row.dot(self.Brd))
+            for j in range(i + 1):
+                theta_h[(i * 3):(3 * i + 3), (3 * (i - j)):(3 * (i - j) + 3)] = np.dot(C, theta_h_row.dot(self.Bhd))
+                theta_r[(i * 3):(3 * i + 3), (3 * (i - j)):(3 * (i - j) + 3)] = np.dot(C, theta_h_row.dot(self.Brd))
                 theta_h_row = theta_h_row.dot(self.Ad)
             phi_row = np.dot(phi_row, self.Ad)
 
@@ -109,13 +110,13 @@ class sharedController:
         for i in range(1, lenReplanA + 3):
             for j in range(1, lenReplanA):
                 if i == j:
-                    replanA[i-1, j-1] = 1
+                    replanA[i - 1, j - 1] = 1
                 elif i == j + 1:
-                    replanA[i-1, j-1] = -3
+                    replanA[i - 1, j - 1] = -3
                 elif i == j + 2:
-                    replanA[i-1, j-1] = 3
+                    replanA[i - 1, j - 1] = 3
                 elif i == j + 3:
-                    replanA[i-1, j-1] = -1
+                    replanA[i - 1, j - 1] = -1
         self.R = replanA.T.dot(replanA)
 
     def updateState(self, w):
@@ -123,7 +124,6 @@ class sharedController:
         if w.shape[0] != 6 or w.shape[1] != 1:
             print("Error: The shape of w is worng")
             return
-        
 
         self.w = w
 
@@ -131,7 +131,7 @@ class sharedController:
         # 检查轨迹是否为6*n的矩阵
         if robotGlobalTraj.shape[0] != 6:
             print("Error: The shape of robotGlobalTraj is not 6*n")
-            return 
+            return
         elif robotGlobalTraj.shape[1] < self.localLen:
             print("Error: The length of robotGlobalTraj is less than localLen")
             return
@@ -142,13 +142,13 @@ class sharedController:
     def gethumanLocalTraj(self, stickPos, stickForce):
         endEffectorPos = self.w[0:3]
 
-        distance = (stickPos[0]**2 + stickPos[1]**2)**0.5 ## 只考虑二维情况
+        distance = (stickPos[0] ** 2 + stickPos[1] ** 2) ** 0.5  ## 只考虑二维情况
         # print("distance", distance)
-        deltaT = 1/self.controllerFreq
-        t = np.arange(0, self.localLen*deltaT, deltaT)
-        speedAmplitude = 0.5                    # 遥操作杆偏离中心的位置与机器人末端运动速度的比例系数
+        deltaT = 1 / self.controllerFreq
+        t = np.arange(0, self.localLen * deltaT, deltaT)
+        speedAmplitude = 0.5  # 遥操作杆偏离中心的位置与机器人末端运动速度的比例系数
 
-        force = (stickForce[0]**2 + stickForce[1]**2)**0.5 ## 只考虑二维情况
+        force = (stickForce[0] ** 2 + stickForce[1] ** 2) ** 0.5  ## 只考虑二维情况
         # print("force", force)
 
         if distance > 0.01:
@@ -178,21 +178,26 @@ class sharedController:
         d = np.linalg.norm(endEffectorPos - desiredPos)
         d_max = min(d, d_res)
 
-        a1_ = 0.97
-        a2_ = 0.25
-        mu_ = 0.15
-        eta_ = 0.000001
+        # a1_ = 0.97
+        # a2_ = 0.25
+        # mu_ = 0.15
+        # eta_ = 0.000001
 
-        d_sat = (a1_ * d_res) / (1 + eta_ * math.exp(-mu_ * (d_max - a2_ * d_res))) ** (1 /eta_)
+        # 这组参数需要在d_res变化时重新调节
+        a1_ = 1  # 在不取max时，d趋向无穷的时候，d_sat趋向于 d_res * a1_
+        a2_ = 0.25  # a2_越大，lambda曲线开始时死区越长
+        mu_ = 200  # mu_越大，曲线越早达到极限值
+        eta_ = 0.1
 
-        self.lambda_ = np.sqrt(d_res**2 - d_sat**2) / d_res
+        d_sat = (a1_ * d_res) / (1 + eta_ * math.exp(-mu_ * (d_max - a2_ * d_res))) ** (1 / eta_)
+
+        self.lambda_ = np.sqrt(d_res ** 2 - d_sat ** 2) / d_res
 
         # debug
         # print("d_max", d_max)
         print("d", d)
         # print("d_res", d_res)
         print("lambda_", self.lambda_)
-        
 
     def reshapeLocalTraj(self, localTraj):
         # 检查localTraj是否为3*n的矩阵
@@ -204,18 +209,18 @@ class sharedController:
             print("localTraj.shape[1]", localTraj.shape[1])
             return
 
-        reshaped = np.zeros((3*self.localLen, 1))
+        reshaped = np.zeros((3 * self.localLen, 1))
         for i in range(self.localLen):
-            reshaped[(i*3):(3*i+3), 0] = localTraj[:, i]
+            reshaped[(i * 3):(3 * i + 3), 0] = localTraj[:, i]
 
         return reshaped
-    
+
     def getHumanIntent(self):
 
         # print("humanIntent", self.hunmanIntent)
 
         return self.hunmanIntent
-    
+
     # 由于要求局部重规划轨迹长度不变，会进行抽样操作，所以此处的avrspeed变量意义不大，只要足够小就可以
     def changeGlobalTraj(self, currentTrajIndex, humanForce, obstacles, avrSpeed):
         startPoint = self.robotGlobalTraj[:3, currentTrajIndex].reshape((3, 1))
@@ -223,9 +228,10 @@ class sharedController:
 
         # ----- 轨迹循环读取 -----
         if currentTrajIndex + self.replanLen > self.robotGLobalLen:
-            endPoint = self.robotGlobalTraj[:3, currentTrajIndex+self.replanLen-self.robotGLobalLen-1].reshape((3, 1))
+            endPoint = self.robotGlobalTraj[:3, currentTrajIndex + self.replanLen - self.robotGLobalLen - 1].reshape(
+                (3, 1))
         else:
-            endPoint = self.robotGlobalTraj[:3, currentTrajIndex+self.replanLen-1].reshape((3, 1))
+            endPoint = self.robotGlobalTraj[:3, currentTrajIndex + self.replanLen - 1].reshape((3, 1))
         # ----- 轨迹循环读取 -----
 
         # 局部轨迹重规划的搜索空间
@@ -237,7 +243,7 @@ class sharedController:
         for obstacle in obstacles:
             if obstacle['state'] == 1:
                 pathPlanner.addObstacle(obstacle['center'], obstacle['radius'])
-        
+
         trajSet = []
 
         for i in range(self.replanPathNum):
@@ -249,15 +255,17 @@ class sharedController:
 
             # ----- 轨迹循环读取 -----
             if currentTrajIndex + self.replanLen > self.robotGLobalLen:
-                endVel = self.robotGlobalTraj[3:6, currentTrajIndex+self.replanLen-self.robotGLobalLen-1].reshape((3, 1))
+                endVel = self.robotGlobalTraj[3:6, currentTrajIndex + self.replanLen - self.robotGLobalLen - 1].reshape(
+                    (3, 1))
             else:
-                endVel = self.robotGlobalTraj[3:6, currentTrajIndex+self.replanLen-1].reshape((3, 1))
+                endVel = self.robotGlobalTraj[3:6, currentTrajIndex + self.replanLen - 1].reshape((3, 1))
             # ----- 轨迹循环读取 -----
 
             # 由于轨迹信息中没有存储加速度，这里的加速度将不连续
             startAcc = np.array([0, 0, 0]).reshape((3, 1))
-            endAcc = np.array([0, 0, 0]).reshape((3, 1)) 
-            miniJerkTrajPlanner = MinimumTrajPlanner(path, avrSpeed, self.controllerFreq, startVel, startAcc, endVel, endAcc, 3)
+            endAcc = np.array([0, 0, 0]).reshape((3, 1))
+            miniJerkTrajPlanner = MinimumTrajPlanner(path, avrSpeed, self.controllerFreq, startVel, startAcc, endVel,
+                                                     endAcc, 3)
             miniJerkTraj = miniJerkTrajPlanner.computeTraj()
 
             # 轨迹抽样（保证了更新的局部轨迹与原轨迹在时间上的一致性，但是牺牲了轨迹的平均速度期望）
@@ -265,24 +273,30 @@ class sharedController:
             miniJerkTrajSampled = np.zeros((6, self.replanLen))
             for j in range(self.replanLen):
                 miniJerkTrajSampled[:, j] = miniJerkTraj[:, int(index[j])]
-            
+
             if miniJerkTrajSampled.shape != (6, self.replanLen):
                 raise Exception("Error: The shape of miniJerkTrajSampled is wrong")
 
             trajSet.append(miniJerkTrajSampled)
-        
-        originTrajPosition = self.robotGlobalTraj[:3, currentTrajIndex:(currentTrajIndex+self.replanLen)]
+
+        originTrajPosition = self.robotGlobalTraj[:3, currentTrajIndex:(currentTrajIndex + self.replanLen)]
         humanForceVector = np.ones((3, self.replanLen))
         humanForceVector[0, :] = humanForce[0]
         humanForceVector[1, :] = humanForce[1]
-        humanForceVector[2, :] = 0 ## 只考虑二维情况
+        humanForceVector[2, :] = 0  ## 只考虑二维情况
 
         # 计算每条备选轨迹的能量
         energySet = []
         for i in range(self.replanPathNum):
-            Ex = 1/(2*self.alpha) * trajSet[i][0, :].dot(self.R.dot(trajSet[i][0, :].T)) + humanForceVector[0, :].dot(trajSet[i][0, :].T) - 1/self.alpha * originTrajPosition[0, :].dot(self.R.dot(trajSet[i][0, :].T))
-            Ey = 1/(2*self.alpha) * trajSet[i][1, :].dot(self.R.dot(trajSet[i][1, :].T)) + humanForceVector[1, :].dot(trajSet[i][1, :].T) - 1/self.alpha * originTrajPosition[1, :].dot(self.R.dot(trajSet[i][1, :].T))
-            Ez = 1/(2*self.alpha) * trajSet[i][2, :].dot(self.R.dot(trajSet[i][2, :].T)) + humanForceVector[2, :].dot(trajSet[i][2, :].T) - 1/self.alpha * originTrajPosition[2, :].dot(self.R.dot(trajSet[i][2, :].T))
+            Ex = 1 / (2 * self.alpha) * trajSet[i][0, :].dot(self.R.dot(trajSet[i][0, :].T)) + humanForceVector[0,
+                                                                                               :].dot(
+                trajSet[i][0, :].T) - 1 / self.alpha * originTrajPosition[0, :].dot(self.R.dot(trajSet[i][0, :].T))
+            Ey = 1 / (2 * self.alpha) * trajSet[i][1, :].dot(self.R.dot(trajSet[i][1, :].T)) + humanForceVector[1,
+                                                                                               :].dot(
+                trajSet[i][1, :].T) - 1 / self.alpha * originTrajPosition[1, :].dot(self.R.dot(trajSet[i][1, :].T))
+            Ez = 1 / (2 * self.alpha) * trajSet[i][2, :].dot(self.R.dot(trajSet[i][2, :].T)) + humanForceVector[2,
+                                                                                               :].dot(
+                trajSet[i][2, :].T) - 1 / self.alpha * originTrajPosition[2, :].dot(self.R.dot(trajSet[i][2, :].T))
 
             energySet.append(Ex + Ey + Ez)
         # 最小能量对应的轨迹
@@ -296,10 +310,15 @@ class sharedController:
 
         # ----- 轨迹循环写入 -----
         if currentTrajIndex + self.replanLen > self.robotGLobalLen:
-            self.robotGlobalTraj[:, currentTrajIndex:] = trajSet[miniEnergyIndex][:, :self.robotGLobalLen-currentTrajIndex]
-            self.robotGlobalTraj[:, :(currentTrajIndex+self.replanLen-self.robotGLobalLen)] = trajSet[miniEnergyIndex][:, self.robotGLobalLen-currentTrajIndex:]
+            self.robotGlobalTraj[:, currentTrajIndex:] = trajSet[miniEnergyIndex][:,
+                                                         :self.robotGLobalLen - currentTrajIndex]
+            self.robotGlobalTraj[:, :(currentTrajIndex + self.replanLen - self.robotGLobalLen)] = trajSet[
+                                                                                                      miniEnergyIndex][
+                                                                                                  :,
+                                                                                                  self.robotGLobalLen - currentTrajIndex:]
         else:
-            self.robotGlobalTraj[:, currentTrajIndex:(currentTrajIndex+self.replanLen)] = trajSet[miniEnergyIndex][:, :self.replanLen]
+            self.robotGlobalTraj[:, currentTrajIndex:(currentTrajIndex + self.replanLen)] = trajSet[miniEnergyIndex][:,
+                                                                                            :self.replanLen]
         # ----------------------
 
         return self.robotGlobalTraj
@@ -314,9 +333,11 @@ class sharedController:
         # ----- 轨迹循环读取 -----
         if robotGlobalTrajStartIndex + self.localLen > self.robotGLobalLen:
             self.robotLocalTraj = self.robotGlobalTraj[:3, robotGlobalTrajStartIndex:]
-            self.robotLocalTraj = np.hstack((self.robotLocalTraj, self.robotGlobalTraj[:3, :(robotGlobalTrajStartIndex+self.localLen-self.robotGLobalLen)]))
+            self.robotLocalTraj = np.hstack((self.robotLocalTraj, self.robotGlobalTraj[:3, :(
+                        robotGlobalTrajStartIndex + self.localLen - self.robotGLobalLen)]))
         else:
-            self.robotLocalTraj = self.robotGlobalTraj[:3, robotGlobalTrajStartIndex:(robotGlobalTrajStartIndex+self.localLen)]
+            self.robotLocalTraj = self.robotGlobalTraj[:3,
+                                  robotGlobalTrajStartIndex:(robotGlobalTrajStartIndex + self.localLen)]
         # ----------------------
 
         # 当人类无意图时，人类局部轨迹与机器人局部轨迹相同
@@ -332,31 +353,32 @@ class sharedController:
         # np.savetxt("X_d.txt", X_d)
 
         # 将Q_h和Q_r对角拼接
-        Q = np.vstack((np.hstack((self.Qh * self.lambda_, np.zeros((3*self.localLen, 3*self.localLen)))), np.hstack((np.zeros((3*self.localLen, 3*self.localLen)), self.Qr * (1-self.lambda_)))))
+        Q = np.vstack((np.hstack((self.Qh * self.lambda_, np.zeros((3 * self.localLen, 3 * self.localLen)))),
+                       np.hstack((np.zeros((3 * self.localLen, 3 * self.localLen)), self.Qr * (1 - self.lambda_)))))
         SQ = np.sqrt(Q)
-        SP = np.eye(3*self.localLen)
+        SP = np.eye(3 * self.localLen)
         wx = np.vstack((self.w, X_d))
 
         tmp1_L_h = np.linalg.pinv(np.vstack((SQ.dot(self.theta_hg), np.sqrt(self.lambda_) * SP)))
-        tmp2_L_h = np.vstack((SQ, np.zeros((3*self.localLen, 6*self.localLen))))
+        tmp2_L_h = np.vstack((SQ, np.zeros((3 * self.localLen, 6 * self.localLen))))
         L_h = tmp1_L_h.dot(tmp2_L_h)
 
-        tmp1_L_r = np.linalg.pinv(np.vstack((SQ.dot(self.theta_rg), np.sqrt(1-self.lambda_) * SP)))
-        tmp2_L_r = np.vstack((SQ, np.zeros((3*self.localLen, 6*self.localLen))))
+        tmp1_L_r = np.linalg.pinv(np.vstack((SQ.dot(self.theta_rg), np.sqrt(1 - self.lambda_) * SP)))
+        tmp2_L_r = np.vstack((SQ, np.zeros((3 * self.localLen, 6 * self.localLen))))
         L_r = tmp1_L_r.dot(tmp2_L_r)
 
         H_h = np.hstack((-L_h.dot(self.phi_g), L_h))
         H_r = np.hstack((-L_r.dot(self.phi_g), L_r))
 
-        k_r1 = np.eye(3*self.localLen) - np.dot(L_r.dot(self.theta_hg), L_h.dot(self.theta_rg))
+        k_r1 = np.eye(3 * self.localLen) - np.dot(L_r.dot(self.theta_hg), L_h.dot(self.theta_rg))
         k_r2 = H_r - np.dot(L_r.dot(self.theta_hg), H_h)
         k_r = np.linalg.pinv(k_r1).dot(k_r2)
 
-        k_h1 = np.eye(3*self.localLen) - np.dot(L_h.dot(self.theta_rg), L_r.dot(self.theta_hg))
+        k_h1 = np.eye(3 * self.localLen) - np.dot(L_h.dot(self.theta_rg), L_r.dot(self.theta_hg))
         k_h2 = H_h - np.dot(L_h.dot(self.theta_rg), H_r)
         k_h = np.linalg.pinv(k_h1).dot(k_h2)
 
-        k_0 = np.zeros((3, 3*self.localLen))
+        k_0 = np.zeros((3, 3 * self.localLen))
         k_0[:3, :3] = np.eye(3)
 
         u_r = np.dot(k_0, k_r.dot(wx))
@@ -366,6 +388,42 @@ class sharedController:
 
         return w_next
 
-        
 
-
+# # 调节lambda计算参数
+# def computeLambda(d_res, d, a1_, a2_, mu_, eta_):
+#     d_max = min(d, d_res)
+#
+#     # a1_ = 0.97
+#     # a2_ = 0.25
+#     # mu_ = 0.15
+#     # eta_ = 0.000001
+#
+#     d_sat = (a1_ * d_res) / (1 + eta_ * math.exp(-mu_ * (d_max - a2_ * d_res))) ** (1 / eta_)
+#
+#     lambda_ = np.sqrt(d_res ** 2 - d_sat ** 2) / d_res
+#
+#     return lambda_
+#
+#
+# if __name__ == "__main__":
+#     from matplotlib import pyplot as plt
+#     d_res = 0.04
+#     d = np.arange(0, 0.1, 0.001)
+#
+#     # 这组参数需要在d_res变化时重新调节
+#     a1_ = 1    # 在不取max时，d趋向无穷的时候，d_sat趋向于 d_res * a1_
+#     a2_ = 0.25   # a2_越大，lambda曲线开始时死区越长
+#     mu_ = 200   # mu_越大，曲线越早达到极限值
+#     eta_ = 0.1
+#
+#     # 绘制lambda与d的关系
+#     lambda_ = []
+#     for i in range(len(d)):
+#         lambda_.append(computeLambda(d_res, d[i], a1_, a2_, mu_, eta_))
+#     plt.plot(d, lambda_)
+#     plt.xlabel("d")
+#     plt.ylabel("lambda")
+#     # 设置坐标轴范围
+#     # plt.xlim(0, 0.5)
+#     # plt.ylim(0, 1)
+#     plt.show()
