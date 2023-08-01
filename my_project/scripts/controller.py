@@ -186,7 +186,7 @@ class Controller:
         z = z - self.cooridinateTransformZ
 
         center = np.array([x, y, z]).reshape((3, 1))
-        radius = 0.07
+        radius = 0.03
 
         centerLast = self.ObstacleSet[1]['center']
 
@@ -310,9 +310,13 @@ initX = -0.46015
 initY = 0.11484
 initZ = 0.20458
 
-# 运动边界
+# 绝对运动边界
+# Xrange = [-0.94, -0.36]
+# Yrange = [-1, 0.2]
+# Zrange = [-1, 1]
+
 Xrange = [-0.26, 0.1]
-Yrange = [-1, 1]
+Yrange = [-1, 0]
 Zrange = [-1, 1]
 
 iniQ1 = -1.0912
@@ -325,6 +329,13 @@ iniQ7 = -0.2546
 
 controller = Controller(controllerFreq)
 controller.initObstacleSet(3)
+
+##########################################################################
+
+# 初始化机器人位姿
+# controller.setInitPos(initX + R, initY, initZ, initOrientationX, initOrientationY, initOrientationZ, initOrientationW)
+controller.setInitPose(iniQ1, iniQ2, iniQ3, iniQ4, iniQ5, iniQ6, iniQ7)
+controller.setInitPos(initX, initY, initZ)
 
 ##########################################################################
 
@@ -406,11 +417,6 @@ print("trajectory planning is done")
 
 ##########################################################################
 
-# 初始化机器人位姿
-# controller.setInitPos(initX + R, initY, initZ, initOrientationX, initOrientationY, initOrientationZ, initOrientationW)
-controller.setInitPose(iniQ1, iniQ2, iniQ3, iniQ4, iniQ5, iniQ6, iniQ7)
-controller.setInitPos(initX, initY, initZ)
-
 # 设置机器人运动边界
 pos1 = np.array([initX + Xrange[0], initY + Yrange[0], initZ + Zrange[0]]).reshape((3, 1))
 pos2 = np.array([initX + Xrange[1], initY + Yrange[1], initZ + Zrange[1]]).reshape((3, 1))
@@ -438,16 +444,16 @@ while not rospy.is_shutdown():
     humanIntent = sharedcontroller.getHumanIntent()
 
     # 可以考虑减小轨迹重规划的频率, 慢10倍
-    # if i % 10 == 0:
-    #     if humanIntent == 2:
-    #         print("wait for trajectory replanning")
-    #         startTime = time.time()
+    if i % 10 == 0:
+        if humanIntent == 2:
+            print("wait for trajectory replanning")
+            startTime = time.time()
 
-    #         changedTrajectory = sharedcontroller.changeGlobalTraj(i, stickForce, obstacles, avrSpeed)
-    #         controller.publishRobotTrajectory(changedTrajectory)
+            changedTrajectory = sharedcontroller.changeGlobalTraj(i, stickForce, obstacles, avrSpeed)
+            controller.publishRobotTrajectory(changedTrajectory)
 
-    #         endTime = time.time()
-    #         print("trajectory replanning is done, time cost: ", endTime - startTime)
+            endTime = time.time()
+            print("trajectory replanning is done, time cost: ", endTime - startTime)
 
     w_next = sharedcontroller.computeLocalTraj(i)
     # print("humanIntent: ", humanIntent)

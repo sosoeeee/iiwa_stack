@@ -51,7 +51,7 @@ class sharedController:
         self.thresholdForce = 2.5
 
         # 轨迹重规划长度
-        self.replanLen = 100
+        self.replanLen = 200
         self.R = None
         self.replanPathNum = 10  # 备选重规划轨迹数量
         self.alpha = 100  # 重规划轨迹优化时人类意图的权重
@@ -174,6 +174,10 @@ class sharedController:
         endEffectorPos = self.w[0:3].reshape((3, 1))
         desiredPos = self.robotGlobalTraj[0:3, currentTrajIndex].reshape((3, 1))
 
+        # 选择轨迹上距离末端最近的点作为d_res
+        index = np.argmin(np.linalg.norm(self.robotGlobalTraj[:3, :] - endEffectorPos, axis=0))
+        desiredPos = self.robotGlobalTraj[0:3, index].reshape((3, 1))
+
         d_res = min(np.linalg.norm(desiredPos - obstaclePoints, axis=0))
         d = np.linalg.norm(endEffectorPos - desiredPos)
         d_max = min(d, d_res)
@@ -193,11 +197,14 @@ class sharedController:
 
         self.lambda_ = np.sqrt(d_res ** 2 - d_sat ** 2) / d_res
 
+        # self.lambda_ = 1
+
         # debug
         # print("d_max", d_max)
-        print("d", d)
+        # print("d", d)
         # print("d_res", d_res)
         print("lambda_", self.lambda_)
+        # print(currentTrajIndex, index)
 
     def reshapeLocalTraj(self, localTraj):
         # 检查localTraj是否为3*n的矩阵
@@ -234,9 +241,13 @@ class sharedController:
             endPoint = self.robotGlobalTraj[:3, currentTrajIndex + self.replanLen - 1].reshape((3, 1))
         # ----- 轨迹循环读取 -----
 
-        # 局部轨迹重规划的搜索空间
+        # # 局部轨迹重规划的搜索空间
+        # Xrange = [-0.94, -0.36]
+        # Yrange = [-1, 0.2]
+        # Zrange = [-1, 1]
+
         Xrange = [-0.5, 0.5]
-        Yrange = [-0.5, 0.5]
+        Yrange = [-0.5, 0.1]
         Zrange = [-0.5, 0.5]
 
         pathPlanner = PathPlanner(startPoint, endPoint, np.array([Xrange, Yrange, Zrange]))
@@ -305,19 +316,32 @@ class sharedController:
         if trajSet[miniEnergyIndex].shape != (6, self.replanLen):
             raise Exception("Error: The shape of miniEnergyTraj is wrong")
 
+        # 轨迹采样平滑
+        indexStep = 20
+        pathSampled = np.zeros((3, int(self.replanLen / indexStep)))
+        for i in range(int(self.replanLen / indexStep)):
+            index_ = i * indexStep
+            pathSampled[:, i] = trajSet[miniEnergyIndex][:3, index_]
+        pathSampled[:, -1] = trajSet[miniEnergyIndex][:3, -1]
+        print(pathSampled.shape)
+        TrajPlanner = MinimumTrajPlanner(pathSampled, avrSpeed, self.controllerFreq, startVel, startAcc, endVel, endAcc, 3)
+        Traj = TrajPlanner.computeTraj()
+        # 轨迹重采样成self.replanLen的长度
+        index = np.arange(0, self.replanLen, 1) * (Traj.shape[1] / self.replanLen)
+        miniJerkTrajSampled = np.zeros((6, self.replanLen))
+        for j in range(self.replanLen):
+            miniJerkTrajSampled[:, j] = Traj[:, int(index[j])]
+
         # 改变轨迹
-        # self.robotGlobalTraj[:, currentTrajIndex:(currentTrajIndex+self.replanLen)] = trajSet[miniEnergyIndex][:, :self.replanLen]
+        # self.robotGlobalTraj[:, currentTrajIndex:(currentTrajIndex+self.replanLen)] = miniJerkTrajSampled[:, :self.replanLen]
 
         # ----- 轨迹循环写入 -----
         if currentTrajIndex + self.replanLen > self.robotGLobalLen:
-            self.robotGlobalTraj[:, currentTrajIndex:] = trajSet[miniEnergyIndex][:,
+            self.robotGlobalTraj[:, currentTrajIndex:] = miniJerkTrajSampled[:,
                                                          :self.robotGLobalLen - currentTrajIndex]
-            self.robotGlobalTraj[:, :(currentTrajIndex + self.replanLen - self.robotGLobalLen)] = trajSet[
-                                                                                                      miniEnergyIndex][
-                                                                                                  :,
-                                                                                                  self.robotGLobalLen - currentTrajIndex:]
+            self.robotGlobalTraj[:, :(currentTrajIndex + self.replanLen - self.robotGLobalLen)] = miniJerkTrajSampled[:, self.robotGLobalLen - currentTrajIndex:]
         else:
-            self.robotGlobalTraj[:, currentTrajIndex:(currentTrajIndex + self.replanLen)] = trajSet[miniEnergyIndex][:,
+            self.robotGlobalTraj[:, currentTrajIndex:(currentTrajIndex + self.replanLen)] = miniJerkTrajSampled[:,
                                                                                             :self.replanLen]
         # ----------------------
 

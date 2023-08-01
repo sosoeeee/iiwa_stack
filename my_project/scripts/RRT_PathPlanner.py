@@ -1,4 +1,5 @@
 import numpy as np
+import time
 
 
 class PathPlanner:
@@ -92,16 +93,23 @@ class PathPlanner:
         # RRT搜索
         # optimize：是否进行路径优化
 
+        if self.pointCollisionDetection(self.startPoint):
+            raise Exception("Start point is in obstacles!")
+
         iterTime = 0
         RRTTree = [[self.startPoint, -1]]
 
         while iterTime < self.maxIterNum:
             iterTime += 1
 
+            if iterTime % 1000 == 0:
+                print("RRT searching")
+
             # 按概率生成随机点
             if np.random.rand() > self.greedyProb:
                 randPoint = np.random.rand(3) * (self.searchSpace[:, 1] - self.searchSpace[:, 0]) + self.searchSpace[:, 0]
                 randPoint = randPoint.reshape((3, 1)) + self.startPoint
+                # randPoint = randPoint.reshape((3, 1)) # 使用绝对搜索空间
             else:
                 randPoint = self.endPoint
 
@@ -129,6 +137,9 @@ class PathPlanner:
                 startIndex = minIndex
                 break
 
+        if iterTime == self.maxIterNum:
+            raise Exception("RRT Search failed")
+
         # 从终点回溯到起点
         self.path = self.endPoint
         while startIndex != -1:
@@ -136,7 +147,7 @@ class PathPlanner:
             startIndex = RRTTree[startIndex][1]
 
         # DEBUG
-        if np.linalg.norm(self.path[:, 0] - self.startPoint) == 0 and np.linalg.norm(self.path[:, -1] - self.endPoint) == 0:
+        if np.linalg.norm(self.path[:, 0].reshape(3, 1) - self.startPoint) == 0 and np.linalg.norm(self.path[:, -1].reshape(3, 1) - self.endPoint) == 0:
             print("RRT search done")
 
         # 路径优化
@@ -175,7 +186,11 @@ class PathPlanner:
             startPoint = greedyPath[:, i].reshape((3, 1))
             endPoint = greedyPath[:, i + 1].reshape((3, 1))
             if np.linalg.norm(endPoint - startPoint) > maxDistance:
-                newPointNum = int(np.linalg.norm(endPoint - startPoint) / maxDistance)
+                newPointNum = int(np.ceil(np.linalg.norm(endPoint - startPoint) / maxDistance))
+
+                if newPointNum < 2:
+                    raise Exception("Extend Path Error")
+
                 newPointSet = startPoint + (endPoint - startPoint) / newPointNum
                 for j in range(1, newPointNum - 1):
                     newPoint = startPoint + (endPoint - startPoint) / newPointNum * (j + 1)
@@ -186,3 +201,6 @@ class PathPlanner:
                 
         # self.path = greedyPath
         self.path = extendPath
+        # np.savetxt('greedyPath.txt', greedyPath, fmt='%.4f', delimiter=',')
+        # np.savetxt('extendPath.txt', extendPath, fmt='%.4f', delimiter=',')
+        

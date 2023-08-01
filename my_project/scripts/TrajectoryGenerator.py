@@ -168,6 +168,7 @@ class MinimumTrajPlanner:
         #     print('T is right')
 
         self.ts = np.array(self.ts)
+        # np.savetxt('ts.txt', self.ts, fmt='%.4f', delimiter=',')
 
     def computeQ(self, n, r, t1, t2):
         # n:polynormial order
@@ -228,10 +229,11 @@ class MinimumTrajPlanner:
                     A[n_continuous * 2 * (i - 1) + j - 1 + n_continuous, n_coef * (i - 1) + k - 1] = np.prod(
                         np.arange(k - j + 1, k)) * t2
 
-        # 计算A的行列式
-        print('A的行列式为：', np.linalg.det(A))
-        # 计算A的秩
-        print('A的秩为：', np.linalg.matrix_rank(A), n_coef * n_seg)
+        # np.savetxt('A.txt', A, fmt='%f', delimiter=',')
+        # # 计算A的行列式
+        # print('A的行列式为:', np.linalg.det(A))
+        # # 计算A的秩
+        # print('A的秩为:', np.linalg.matrix_rank(A), A.shape)
 
         # compute M
         M = np.zeros((n_continuous * 2 * n_seg, n_continuous * (n_seg + 1)))
