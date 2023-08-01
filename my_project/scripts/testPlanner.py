@@ -10,10 +10,12 @@ start = time.time()
 startPoint = np.array([0, 0, 0]).reshape((3, 1))
 endPoint = np.array([1, 1, 0]).reshape((3, 1))
 
-PathPlanner = PathPlanner(startPoint, endPoint)
+searchRange = np.array([[-0.5, 1.5], [-0.5, 1.5], [0, 0]])
+
+PathPlanner = PathPlanner(startPoint, endPoint, searchRange)
 PathPlanner.addObstacle(np.array([0.4, 0.4, 0]).reshape((3, 1)), 0.3)
 
-path = PathPlanner.RRT(False)
+path = PathPlanner.RRT(True)
 
 end = time.time()
 
@@ -52,10 +54,10 @@ v0 = np.array([0, 0, 0]).reshape((3, 1))
 a0 = np.array([0, 0, 0]).reshape((3, 1))
 vt = np.array([0, 0, 0]).reshape((3, 1))
 at = np.array([0, 0, 0]).reshape((3, 1))
-miniJerkTrajPlanner = MinimumTrajPlanner(path, 0.01, 20, v0, a0, vt, at, 3)
+miniJerkTrajPlanner = MinimumTrajPlanner(path, 1, 20, v0, a0, vt, at, 3)
 traj = miniJerkTrajPlanner.computeTraj()
 
-print(traj.shape)
+# print(traj.shape)
 
 end = time.time()
 

@@ -204,10 +204,10 @@ class MinimumTrajPlanner:
             Q_k = self.computeQ(self.order, self.r, self.ts[k], self.ts[k + 1])
             Q[k * n_coef:(k + 1) * n_coef, k * n_coef:(k + 1) * n_coef] = Q_k
 
-        # compute Tk Tk(i,j) = ts(i)^(j-1)
+        # compute Tk Tk(i,j) = ts(i)^(j)
         Tk = np.zeros((n_seg + 1, n_coef))
         for i in range(n_coef):
-            Tk[:, i] = self.ts ** i  ## 待检测
+            Tk[:, i] = self.ts ** i
 
         # compute A
         n_continuous = 3  # 1:p  2:pv  3:pva  4:pvaj  5:pvajs
@@ -215,16 +215,23 @@ class MinimumTrajPlanner:
         for i in range(1, n_seg + 1):
             for j in range(1, n_continuous + 1):
                 for k in range(j, n_coef + 1):
-                    if k == j:
-                        t1 = 1
-                        t2 = 1
-                    else:
-                        t1 = Tk[i - 1, k - j]
-                        t2 = Tk[i, k - j]
+                    # if k == j:
+                    #     t1 = 1
+                    #     t2 = 1
+                    # else:
+                    #     t1 = Tk[i - 1, k - j]
+                    #     t2 = Tk[i, k - j]
+                    t1 = Tk[i - 1, k - j]
+                    t2 = Tk[i, k - j]
                     A[n_continuous * 2 * (i - 1) + j - 1, n_coef * (i - 1) + k - 1] = np.prod(
                         np.arange(k - j + 1, k)) * t1
                     A[n_continuous * 2 * (i - 1) + j - 1 + n_continuous, n_coef * (i - 1) + k - 1] = np.prod(
                         np.arange(k - j + 1, k)) * t2
+
+        # 计算A的行列式
+        print('A的行列式为：', np.linalg.det(A))
+        # 计算A的秩
+        print('A的秩为：', np.linalg.matrix_rank(A), n_coef * n_seg)
 
         # compute M
         M = np.zeros((n_continuous * 2 * n_seg, n_continuous * (n_seg + 1)))
