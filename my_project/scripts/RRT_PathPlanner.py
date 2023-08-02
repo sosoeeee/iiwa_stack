@@ -101,9 +101,8 @@ class PathPlanner:
 
         while iterTime < self.maxIterNum:
             iterTime += 1
-
-            if iterTime % 1000 == 0:
-                print("RRT searching")
+            
+            # startTime = time.time()
 
             # 按概率生成随机点
             if np.random.rand() > self.greedyProb:
@@ -112,6 +111,10 @@ class PathPlanner:
                 # randPoint = randPoint.reshape((3, 1)) # 使用绝对搜索空间
             else:
                 randPoint = self.endPoint
+
+            # endTime = time.time()
+            # print("Generate:", endTime - startTime)
+            # startTime = time.time()
 
             # 找到树上的最近点
             minDis = 1000000
@@ -124,6 +127,10 @@ class PathPlanner:
             # 生成新点
             newPoint = RRTTree[minIndex][0] + (randPoint - RRTTree[minIndex][0]) / minDis * self.step
 
+            # endTime = time.time()
+            # print("Find near:", endTime - startTime)
+            # startTime = time.time()
+
             # 检测新点是否与障碍物相交
             if self.collisionDetection(RRTTree[minIndex][0], newPoint):
                 continue
@@ -131,11 +138,18 @@ class PathPlanner:
             # 将新点加入树
             RRTTree.append([newPoint, minIndex])
 
+            # endTime = time.time()
+            # print("check collision:", endTime - startTime)
+
             # 检测是否到达目标点
             if np.linalg.norm(newPoint - self.endPoint) < self.targetThreshold:
                 # print("RRT search done")
                 startIndex = minIndex
                 break
+
+            if iterTime % 500 == 0:
+                print("Distance to end:", np.linalg.norm(newPoint - self.endPoint))
+                print("RRT searching")
 
         if iterTime == self.maxIterNum:
             raise Exception("RRT Search failed")

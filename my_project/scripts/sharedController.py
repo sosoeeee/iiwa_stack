@@ -8,7 +8,7 @@ from obstacleGenerator import *
 
 
 class sharedController:
-    def __init__(self, controllerFreq):
+    def __init__(self, controllerFreq, localLen, replanLen):
         # 控制频率
         self.controllerFreq = controllerFreq  # Hz
 
@@ -25,7 +25,7 @@ class sharedController:
         self.Bhd = None
 
         # 局部期望轨迹
-        self.localLen = 50
+        self.localLen = localLen
         self.robotLocalTraj = None  # 3*localLen
         self.humanLocalTraj = None  # 3*localLen
 
@@ -34,7 +34,7 @@ class sharedController:
         self.robotGLobalLen = None
 
         # 安全系数
-        self.lambda_ = 0.5
+        self.lambda_ = 1
 
         # 控制器参数
         self.Qr = None
@@ -48,12 +48,12 @@ class sharedController:
         # 1: 有微小意图
         # 2: 有明显意图
         self.hunmanIntent = 0
-        self.thresholdForce = 2.5
+        self.thresholdForce = 3.7
 
         # 轨迹重规划长度
-        self.replanLen = 200
+        self.replanLen = replanLen
         self.R = None
-        self.replanPathNum = 10  # 备选重规划轨迹数量
+        self.replanPathNum = 8  # 备选重规划轨迹数量
         self.alpha = 100  # 重规划轨迹优化时人类意图的权重
 
     def initialize(self, weight_r, weight_h, weight_error):
@@ -203,7 +203,7 @@ class sharedController:
         # print("d_max", d_max)
         # print("d", d)
         # print("d_res", d_res)
-        print("lambda_", self.lambda_)
+        # print("lambda_", self.lambda_)
         # print(currentTrajIndex, index)
 
     def reshapeLocalTraj(self, localTraj):
@@ -231,23 +231,23 @@ class sharedController:
     # 由于要求局部重规划轨迹长度不变，会进行抽样操作，所以此处的avrspeed变量意义不大，只要足够小就可以
     def changeGlobalTraj(self, currentTrajIndex, humanForce, obstacles, avrSpeed):
         startPoint = self.robotGlobalTraj[:3, currentTrajIndex].reshape((3, 1))
-        # endPoint = self.robotGlobalTraj[:3, currentTrajIndex+self.replanLen-1].reshape((3, 1))
+        endPoint = self.robotGlobalTraj[:3, currentTrajIndex+self.replanLen-1].reshape((3, 1))
 
-        # ----- 轨迹循环读取 -----
-        if currentTrajIndex + self.replanLen > self.robotGLobalLen:
-            endPoint = self.robotGlobalTraj[:3, currentTrajIndex + self.replanLen - self.robotGLobalLen - 1].reshape(
-                (3, 1))
-        else:
-            endPoint = self.robotGlobalTraj[:3, currentTrajIndex + self.replanLen - 1].reshape((3, 1))
-        # ----- 轨迹循环读取 -----
+        # # ----- 轨迹循环读取 -----
+        # if currentTrajIndex + self.replanLen > self.robotGLobalLen:
+        #     endPoint = self.robotGlobalTraj[:3, currentTrajIndex + self.replanLen - self.robotGLobalLen - 1].reshape(
+        #         (3, 1))
+        # else:
+        #     endPoint = self.robotGlobalTraj[:3, currentTrajIndex + self.replanLen - 1].reshape((3, 1))
+        # # ----- 轨迹循环读取 -----
 
         # # 局部轨迹重规划的搜索空间
         # Xrange = [-0.94, -0.36]
         # Yrange = [-1, 0.2]
         # Zrange = [-1, 1]
 
-        Xrange = [-0.5, 0.5]
-        Yrange = [-0.5, 0.1]
+        Xrange = [-0.2, 0.2]
+        Yrange = [-0.7, 0.1]
         Zrange = [-0.5, 0.5]
 
         pathPlanner = PathPlanner(startPoint, endPoint, np.array([Xrange, Yrange, Zrange]))
@@ -262,15 +262,15 @@ class sharedController:
             path = pathPlanner.RRT(False)
 
             startVel = self.robotGlobalTraj[3:6, currentTrajIndex].reshape((3, 1))
-            # endVel = self.robotGlobalTraj[3:6, currentTrajIndex+self.replanLen-1].reshape((3, 1))
+            endVel = self.robotGlobalTraj[3:6, currentTrajIndex+self.replanLen-1].reshape((3, 1))
 
-            # ----- 轨迹循环读取 -----
-            if currentTrajIndex + self.replanLen > self.robotGLobalLen:
-                endVel = self.robotGlobalTraj[3:6, currentTrajIndex + self.replanLen - self.robotGLobalLen - 1].reshape(
-                    (3, 1))
-            else:
-                endVel = self.robotGlobalTraj[3:6, currentTrajIndex + self.replanLen - 1].reshape((3, 1))
-            # ----- 轨迹循环读取 -----
+            # # ----- 轨迹循环读取 -----
+            # if currentTrajIndex + self.replanLen > self.robotGLobalLen:
+            #     endVel = self.robotGlobalTraj[3:6, currentTrajIndex + self.replanLen - self.robotGLobalLen - 1].reshape(
+            #         (3, 1))
+            # else:
+            #     endVel = self.robotGlobalTraj[3:6, currentTrajIndex + self.replanLen - 1].reshape((3, 1))
+            # # ----- 轨迹循环读取 -----
 
             # 由于轨迹信息中没有存储加速度，这里的加速度将不连续
             startAcc = np.array([0, 0, 0]).reshape((3, 1))
@@ -317,13 +317,13 @@ class sharedController:
             raise Exception("Error: The shape of miniEnergyTraj is wrong")
 
         # 轨迹采样平滑
-        indexStep = 20
+        indexStep = 30
         pathSampled = np.zeros((3, int(self.replanLen / indexStep)))
         for i in range(int(self.replanLen / indexStep)):
             index_ = i * indexStep
             pathSampled[:, i] = trajSet[miniEnergyIndex][:3, index_]
         pathSampled[:, -1] = trajSet[miniEnergyIndex][:3, -1]
-        print(pathSampled.shape)
+        # print(pathSampled.shape)
         TrajPlanner = MinimumTrajPlanner(pathSampled, avrSpeed, self.controllerFreq, startVel, startAcc, endVel, endAcc, 3)
         Traj = TrajPlanner.computeTraj()
         # 轨迹重采样成self.replanLen的长度
@@ -333,36 +333,36 @@ class sharedController:
             miniJerkTrajSampled[:, j] = Traj[:, int(index[j])]
 
         # 改变轨迹
-        # self.robotGlobalTraj[:, currentTrajIndex:(currentTrajIndex+self.replanLen)] = miniJerkTrajSampled[:, :self.replanLen]
+        self.robotGlobalTraj[:, currentTrajIndex:(currentTrajIndex+self.replanLen)] = miniJerkTrajSampled[:, :self.replanLen]
 
-        # ----- 轨迹循环写入 -----
-        if currentTrajIndex + self.replanLen > self.robotGLobalLen:
-            self.robotGlobalTraj[:, currentTrajIndex:] = miniJerkTrajSampled[:,
-                                                         :self.robotGLobalLen - currentTrajIndex]
-            self.robotGlobalTraj[:, :(currentTrajIndex + self.replanLen - self.robotGLobalLen)] = miniJerkTrajSampled[:, self.robotGLobalLen - currentTrajIndex:]
-        else:
-            self.robotGlobalTraj[:, currentTrajIndex:(currentTrajIndex + self.replanLen)] = miniJerkTrajSampled[:,
-                                                                                            :self.replanLen]
-        # ----------------------
+        # # ----- 轨迹循环写入 -----
+        # if currentTrajIndex + self.replanLen > self.robotGLobalLen:
+        #     self.robotGlobalTraj[:, currentTrajIndex:] = miniJerkTrajSampled[:,
+        #                                                  :self.robotGLobalLen - currentTrajIndex]
+        #     self.robotGlobalTraj[:, :(currentTrajIndex + self.replanLen - self.robotGLobalLen)] = miniJerkTrajSampled[:, self.robotGLobalLen - currentTrajIndex:]
+        # else:
+        #     self.robotGlobalTraj[:, currentTrajIndex:(currentTrajIndex + self.replanLen)] = miniJerkTrajSampled[:,
+        #                                                                                     :self.replanLen]
+        # # ----------------------
 
         return self.robotGlobalTraj
 
     def computeLocalTraj(self, robotGlobalTrajStartIndex):
-        # if robotGlobalTrajStartIndex + self.localLen > self.robotGlobalTraj.shape[1]:
-        #     print("Error: Index out of the range of robotGlobalTraj")
+        if robotGlobalTrajStartIndex + self.localLen > self.robotGlobalTraj.shape[1]:
+            raise Exception("Error: Index out of the range of robotGlobalTraj")
 
         # 当人类有意图时，返回共享控制器计算的局部轨迹
-        # self.robotLocalTraj = self.robotGlobalTraj[:3, robotGlobalTrajStartIndex:(robotGlobalTrajStartIndex+self.localLen)]
+        self.robotLocalTraj = self.robotGlobalTraj[:3, robotGlobalTrajStartIndex:(robotGlobalTrajStartIndex+self.localLen)]
 
-        # ----- 轨迹循环读取 -----
-        if robotGlobalTrajStartIndex + self.localLen > self.robotGLobalLen:
-            self.robotLocalTraj = self.robotGlobalTraj[:3, robotGlobalTrajStartIndex:]
-            self.robotLocalTraj = np.hstack((self.robotLocalTraj, self.robotGlobalTraj[:3, :(
-                        robotGlobalTrajStartIndex + self.localLen - self.robotGLobalLen)]))
-        else:
-            self.robotLocalTraj = self.robotGlobalTraj[:3,
-                                  robotGlobalTrajStartIndex:(robotGlobalTrajStartIndex + self.localLen)]
-        # ----------------------
+        # # ----- 轨迹循环读取 -----
+        # if robotGlobalTrajStartIndex + self.localLen > self.robotGLobalLen:
+        #     self.robotLocalTraj = self.robotGlobalTraj[:3, robotGlobalTrajStartIndex:]
+        #     self.robotLocalTraj = np.hstack((self.robotLocalTraj, self.robotGlobalTraj[:3, :(
+        #                 robotGlobalTrajStartIndex + self.localLen - self.robotGLobalLen)]))
+        # else:
+        #     self.robotLocalTraj = self.robotGlobalTraj[:3,
+        #                           robotGlobalTrajStartIndex:(robotGlobalTrajStartIndex + self.localLen)]
+        # # ----------------------
 
         # 当人类无意图时，人类局部轨迹与机器人局部轨迹相同
         if self.hunmanIntent == 0:

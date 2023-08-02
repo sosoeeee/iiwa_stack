@@ -23,6 +23,10 @@ deltaT = 1/controllerFreq
 len = 50                                # 人生成的期望轨迹长度
 t = np.arange(0, len*deltaT, deltaT)
 speedAmplitude = 0.5                    # 遥操作杆偏离中心的位置与机器人末端运动速度的比例系数
+tick = 0                              # 用于计数绘制操作杆的快照
+PosXALL = []
+PosYALL = []
+thresholdForce = 3.7
 
 robotX = [0] * monitorLen
 robotY = [0] * monitorLen
@@ -32,6 +36,19 @@ initZ = 0.20458
 index = 0
 currentRobotX = 0
 currentRobotY = 0
+
+robotTraj = None
+
+class indexPointListenerThread(QtCore.QThread):
+    # 定义一个信号
+    dataSignal = QtCore.pyqtSignal(str)
+
+    def run(self):
+        rospy.Subscriber("currentIndex", String, self.callback, queue_size=1)
+        rospy.spin()
+    
+    def callback(self, msg):
+        self.dataSignal.emit(msg.data)
 
 class TrajectoryListenerThread(QtCore.QThread):
     # 定义一个信号
@@ -117,10 +134,12 @@ class Figure(QWidget):
                 
         # 添加图像
         self.humanIntent = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='w', name="mode1")
+        self.humanIntentPhoto = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='w', name="mode7")
         self.robotPosition = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='r', name="mode2")
         self.robotTrajectory = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='b', name="mode3")
-        self.humanTrajectory = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='g', name="mode4")
+        self.humanTrajectory = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=6, symbolBrush='g', name="mode4")
         self.obstacles = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='y', name="mode5")
+        self.indexPoint = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=6, symbolBrush='y', name="mode6")
 
         # Trajcetory 监听器
         self.trajectoryListener_thread = TrajectoryListenerThread()
@@ -142,6 +161,11 @@ class Figure(QWidget):
         self.obstacleListener_thread.dataSignal.connect(self.updateObstacle)
         self.obstacleListener_thread.start()
         self.obstaclesSet = None
+
+        # index 监听器
+        self.indexPointListener_thread = indexPointListenerThread()
+        self.indexPointListener_thread.dataSignal.connect(self.updateIndexPoint)
+        self.indexPointListener_thread.start()
         
         # 设定轨迹更新定时器
         self.timer = pq.QtCore.QTimer()
@@ -208,12 +232,16 @@ class Figure(QWidget):
         return [x.tolist(), y.tolist()]
 
     def updatestick(self, pointAndForce): ## 只考虑二维情况
+        global PosXALL, PosYALL, tick
+        tick = tick + 1
+
         # 按逗号分割字符串
         pointAndForce = pointAndForce.split(',')
         # 将字符串转换为浮点数
         pointAndForce = [float(i) for i in pointAndForce]
 
         distance = (pointAndForce[0]**2 + pointAndForce[1]**2)**0.5
+        force = (pointAndForce[3]**2 + pointAndForce[4]**2)**0.5
         if distance > 0.01:
             speed = distance * speedAmplitude  # max：2.5cm/s
             cos = pointAndForce[0] / distance
@@ -221,8 +249,22 @@ class Figure(QWidget):
             PosX = speed * cos * t * monitorAmplitude + (currentRobotX - initX) * monitorAmplitude
             PosY = speed * sin * t * monitorAmplitude + (currentRobotY - initY) * monitorAmplitude
             self.humanIntent.setData(PosX, PosY)
+
+            if force > thresholdForce:
+                # 改变颜色和大小
+                self.humanIntent.setPen('r', width=3)
+            else:
+                self.humanIntent.setPen('w', width=1)
+
+            # # 快照模式
+            # if tick % 500 == 0:
+            #     PosXALL = PosXALL + PosX.tolist()
+            #     PosYALL = PosYALL + PosY.tolist()
+            #     self.humanIntentPhoto.setData(PosXALL, PosYALL)
+
         else:
             self.humanIntent.setData([0], [0])
+
 
     def updateRobotTrajectory(self): ## 只考虑二维情况
         global currentRobotX, currentRobotY, index
@@ -234,6 +276,8 @@ class Figure(QWidget):
         self.robotPosition.setData(robotX, robotY)
 
     def updateTrajectory(self, dataDict): ## 只考虑二维情况
+        global robotTraj
+
         # 检查data类型
         data = dataDict['data']
         typeTraj = dataDict['type']
@@ -241,18 +285,39 @@ class Figure(QWidget):
         data = np.array(data)
         len = data.shape[0]
         data = data.reshape((3, int(len/3)))
-        data = data * monitorAmplitude
-
-        # 显示修正
-        data[0, :] = data[0, :] - initX * monitorAmplitude
-        data[1, :] = data[1, :] - initY * monitorAmplitude
 
         # Robot
         if typeTraj == 0:
+            # 显示修正
+            robotTraj = data
+
+            data = data * monitorAmplitude
+            data[0, :] = data[0, :] - initX * monitorAmplitude
+            data[1, :] = data[1, :] - initY * monitorAmplitude
             self.robotTrajectory.setData(data[0, :], data[1, :])
         # Human
         elif typeTraj == 1:
+            # 显示修正
+            data = data * monitorAmplitude
+            data[0, :] = data[0, :] - initX * monitorAmplitude
+            data[1, :] = data[1, :] - initY * monitorAmplitude
             self.humanTrajectory.setData(data[0, :], data[1, :])
+
+    def updateIndexPoint(self, data):
+        data = data.split(',')
+        curIndex = int(data[0])
+        replanLen = int(data[1])
+
+        curX = (robotTraj[0, curIndex] - initX) * monitorAmplitude
+        curY = (robotTraj[1, curIndex] - initY) * monitorAmplitude
+
+        totalLen = robotTraj.shape[1]
+        if curIndex + replanLen < totalLen:
+            replanX = (robotTraj[0, curIndex + replanLen] - initX) * monitorAmplitude
+            replanY = (robotTraj[1, curIndex + replanLen] - initY) * monitorAmplitude
+            self.indexPoint.setData([curX, replanX], [curY, replanY])
+        else:
+            self.indexPoint.setData([curX], [curY])
         
 
 if __name__ == '__main__':

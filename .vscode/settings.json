@@ -2,5 +2,6 @@
      "files.associations": {
           "bitset": "cpp",
           "*.tcc": "cpp"
-     }
+     },
+     "cmake.sourceDirectory": "/home/jun/iiwa_project/src/iiwa_stack/iiwa_control"
 }
