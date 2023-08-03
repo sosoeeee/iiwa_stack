@@ -11,10 +11,10 @@ from RRT_PathPlanner import PathPlanner
 
 from controller import *
     
-usr = 2
+usr = 5
 times = 2
 mode = ["replan", "allHuman"]
-curMode = mode[1]
+curMode = mode[0]
 
 print("--------------START--------------")
 print("USR is %d" % usr)
@@ -165,6 +165,7 @@ realTraj = np.array([initX, initY, initZ]).reshape((3, 1))
 
 i = 0
 totalLen = traj.shape[1]
+changeTimes = 0
 while not rospy.is_shutdown():    
     # 共享控制
     # 获取其他模块的信息
@@ -187,10 +188,13 @@ while not rospy.is_shutdown():
         if totalLen - i > replanLen  and i % 10 == 0:
             if humanIntent == 2:
                 print("wait for trajectory replanning")
+                changeTimes = changeTimes + 1
                 startTime = time.time()
 
                 changedTrajectory = sharedcontroller.changeGlobalTraj(i, stickForce, obstacles, avrSpeed)
                 controller.publishRobotTrajectory(changedTrajectory)
+
+                np.savetxt("Data/%d-%s-CHANGETraj-%d-change:%d.txt" % (usr, curMode, times, changeTimes), changedTrajectory)
 
                 endTime = time.time()
                 print("trajectory replanning is done, time cost: ", endTime - startTime)
