@@ -11,7 +11,8 @@ from RRT_PathPlanner import PathPlanner
 
 from controller import *
     
-usr = 0
+usr = 2
+times = 2
 mode = ["replan", "allHuman"]
 curMode = mode[1]
 
@@ -221,8 +222,8 @@ while not rospy.is_shutdown():
 
 # 保存数据
 forceSet = np.array(forceSet).reshape((-1, 1))
-np.savetxt("Data/%d-%s-forceSet.txt" % (usr, curMode), forceSet, fmt='%.4f')
-np.savetxt("Data/%d-%s-realTraj.txt" % (usr, curMode), realTraj)
+np.savetxt("Data/%d-%s-forceSet-%d.txt" % (usr, curMode, times), forceSet, fmt='%.4f')
+np.savetxt("Data/%d-%s-realTraj-%d.txt" % (usr, curMode, times), realTraj)
 print("--------------END--------------")
 print("SAVE DATA")
 

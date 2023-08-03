@@ -140,6 +140,7 @@ class Figure(QWidget):
         self.humanTrajectory = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=6, symbolBrush='g', name="mode4")
         self.obstacles = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=1, symbolBrush='y', name="mode5")
         self.indexPoint = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=6, symbolBrush='y', name="mode6")
+        self.robotPoint = self.plotWidget_ted.plot([0], [0], pen=None, symbol='o', symbolSize=6, symbolBrush='r', name="mode8")
 
         # Trajcetory 监听器
         self.trajectoryListener_thread = TrajectoryListenerThread()
@@ -274,6 +275,7 @@ class Figure(QWidget):
         # print(robotX)
 
         self.robotPosition.setData(robotX, robotY)
+        self.robotPoint.setData([(currentRobotX - initX) * monitorAmplitude ],[(currentRobotY - initY) * monitorAmplitude ])
 
     def updateTrajectory(self, dataDict): ## 只考虑二维情况
         global robotTraj
