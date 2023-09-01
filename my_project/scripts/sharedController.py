@@ -228,7 +228,7 @@ class sharedController:
 
         return self.hunmanIntent
 
-    # 由于要求局部重规划轨迹长度不变，会进行抽样操作，所以此处的avrspeed变量意义不大，只要足够小就可以
+    # 由于要求局部重规划轨迹点数不变（即轨迹运行时间），会进行抽样操作，所以此处的avrspeed变量意义不大，只要足够小就可以
     def changeGlobalTraj(self, currentTrajIndex, humanForce, obstacles, avrSpeed):
         startPoint = self.robotGlobalTraj[:3, currentTrajIndex].reshape((3, 1))
         endPoint = self.robotGlobalTraj[:3, currentTrajIndex+self.replanLen-1].reshape((3, 1))
@@ -326,6 +326,7 @@ class sharedController:
         # print(pathSampled.shape)
         TrajPlanner = MinimumTrajPlanner(pathSampled, avrSpeed, self.controllerFreq, startVel, startAcc, endVel, endAcc, 3)
         Traj = TrajPlanner.computeTraj()
+        
         # 轨迹重采样成self.replanLen的长度
         index = np.arange(0, self.replanLen, 1) * (Traj.shape[1] / self.replanLen)
         miniJerkTrajSampled = np.zeros((6, self.replanLen))

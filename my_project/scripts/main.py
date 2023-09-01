@@ -230,6 +230,3 @@ np.savetxt("Data/%d-%s-forceSet-%d.txt" % (usr, curMode, times), forceSet, fmt='
 np.savetxt("Data/%d-%s-realTraj-%d.txt" % (usr, curMode, times), realTraj)
 print("--------------END--------------")
 print("SAVE DATA")
-
-
-#https://www.zhihu.com/question/51920876#:~:text=1%201.%20Kazam%20Kazam%E6%98%AF%E9%80%82%E7%94%A8%E4%BA%8ELinux%E6%A1%8C%E9%9D%A2%E7%9A%84%E6%9C%80%E4%BD%B3%E8%BD%BB%E9%87%8F%E7%BA%A7%E5%B1%8F%E5%B9%95%E5%BD%95%E5%83%8F%E6%9C%BA%E4%B9%8B%E4%B8%80%E3%80%82%20...%202%202.%20SimpleScreenRecorder,ScreenStudio%E6%98%AF%E5%8F%A6%E4%B8%80%E6%AC%BE%E6%98%93%E4%BA%8E%E4%BD%BF%E7%94%A8%E4%BD%86%E5%8A%9F%E8%83%BD%E5%BC%BA%E5%A4%A7%E7%9A%84Linux%E5%B1%8F%E5%B9%95%E6%92%AD%E6%94%BE%E8%BD%AF%E4%BB%B6%E3%80%82%20...%208%208.%20Byzanz%20...%20More%20items
