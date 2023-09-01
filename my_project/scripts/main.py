@@ -194,7 +194,7 @@ while not rospy.is_shutdown():
                 changedTrajectory = sharedcontroller.changeGlobalTraj(i, stickForce, obstacles, avrSpeed)
                 controller.publishRobotTrajectory(changedTrajectory)
 
-                np.savetxt("Data/%d-%s-CHANGETraj-%d-change:%d.txt" % (usr, curMode, times, changeTimes), changedTrajectory)
+                np.savetxt("Data/%d-%s-CHANGETraj-%d-change-%d.txt" % (usr, curMode, times, changeTimes), changedTrajectory)
 
                 endTime = time.time()
                 print("trajectory replanning is done, time cost: ", endTime - startTime)
