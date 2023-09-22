@@ -197,6 +197,8 @@ class sharedController:
 
         self.lambda_ = np.sqrt(d_res ** 2 - d_sat ** 2) / d_res
 
+        return self.lambda_
+
         # self.lambda_ = 1
 
         # debug

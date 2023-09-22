@@ -159,9 +159,11 @@ sharedcontroller.setRobotGlobalTraj(traj)
 
 ##########################################################################
 
-# 记录数据
-forceSet = []
-realTraj = np.array([initX, initY, initZ]).reshape((3, 1))
+# 记录数据(第一行数据为0，无意义)
+forceSet = np.array([0, 0]).reshape((1, 2))
+distanceSet = np.array([0, 0]).reshape((1, 2))
+realTraj = np.array([0, 0, 0]).reshape((1, 3))
+PSISet = [0]
 
 i = 0
 totalLen = traj.shape[1]
@@ -182,7 +184,7 @@ while not rospy.is_shutdown():
 
     # 模式切换
     if curMode == 'replan':
-        sharedcontroller.computeLambda(controller.getAllObstaclesPoints(), i) # 计算SPI
+        PSI = sharedcontroller.computeLambda(controller.getAllObstaclesPoints(), i) # 计算SPI
 
         # 可以考虑减小轨迹重规划的频率, 慢10倍
         if totalLen - i > replanLen  and i % 10 == 0:
@@ -218,15 +220,19 @@ while not rospy.is_shutdown():
     # controller.publishState(TrajectoryString)
 
     # 数据收集
-    force = (stickForce[0] ** 2 + stickForce[1] ** 2) ** 0.5
-    forceSet.append(force)
-    realTraj = np.hstack((realTraj, w[0:3, 0].reshape((3, 1))))
+    forceSet = np.vstack((forceSet, np.array([stickForce[0], stickForce[1]]).reshape((1, 2))))
+    distanceSet = np.vstack((distanceSet, np.array([stickPos[0], stickPos[1]]).reshape((1, 2))))
+    PSISet.append(PSI)
+    realTraj = np.vstack((realTraj, w[0:3, 0].reshape((1, 3))))
     
     controller.rate.sleep()
 
 # 保存数据
-forceSet = np.array(forceSet).reshape((-1, 1))
+# forceSet = np.array(forceSet).reshape((-1, 1))
+PSISet = np.array(PSISet).reshape((-1, 1))
 np.savetxt("Data/%d-%s-forceSet-%d.txt" % (usr, curMode, times), forceSet, fmt='%.4f')
+np.savetxt("Data/%d-%s-distanceSet-%d.txt" % (usr, curMode, times), distanceSet, fmt='%.4f')
 np.savetxt("Data/%d-%s-realTraj-%d.txt" % (usr, curMode, times), realTraj)
+np.savetxt("Data/%d-%s-PSISet-%d.txt" % (usr, curMode, times), PSISet, fmt='%.4f')
 print("--------------END--------------")
 print("SAVE DATA")

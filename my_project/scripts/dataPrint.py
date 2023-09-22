@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 class TrajectoryPrinter:
     def __init__(self, initZ):
         self.Zplane = initZ
-        self.trajectorySet = []
 
         # 创建图窗
         self.fig = plt.figure()
@@ -16,11 +15,11 @@ class TrajectoryPrinter:
         plt.ylabel('y (m)')
         
 
-    def loadTrajectory(self, trajectory, Label, color, Linestyle='-'):
+    def loadTrajectory(self, trajectory, Label, color, Linestyle='-', endIndex=-1):
         print(trajectory.shape)
 
         # 绘制轨迹并设置粗细
-        plt.plot(trajectory[0, :], trajectory[1, :], color, linestyle=Linestyle, linewidth=1, label=Label)
+        plt.plot(trajectory[0, :endIndex], trajectory[1, :endIndex], color, linestyle=Linestyle, linewidth=1, label=Label)
         plt.legend(loc='upper right')
 
 
@@ -45,6 +44,18 @@ class TrajectoryPrinter:
     
     def loadIntrestingPoint(self, point):
         plt.plot(point[:, 0], point[:, 1], 'r.', markersize=5)
+
+    def loadChangePoint(self, trajectory, index):
+        # 绘制点
+        replanLen = 250 
+        # 使用橙色星形绘制改变点
+        plt.plot(trajectory[0][index], trajectory[1][index], 'black', marker='*', markersize=10)
+        plt.plot(trajectory[0][index + replanLen], trajectory[1][index + replanLen], 'black', marker='*', markersize=10)
+
+        controllerFreq = 10
+        time = index / controllerFreq
+        time = 'time: ' + str(time) + 's'
+        plt.text(trajectory[0][index] - 0.16, trajectory[1][index] - 0.01, time, fontsize=8)
 
     def print(self):
         plt.show()
@@ -156,43 +167,47 @@ def OneFactorANOVA(group1, group2):
 
 if __name__ == "__main__":
     #=========================================================# # 画轨迹图
-    # human = 3
-    # initZ = 0.20458
-    # trajectoryPrinter = TrajectoryPrinter(initZ)
+    human = 5
+    initZ = 0.20458
+    trajectoryPrinter = TrajectoryPrinter(initZ)
 
-    # # 绘制兴趣点
-    # intrestingPointSet = np.loadtxt("my_project\scripts\Data\intrestingPoint.txt")
-    # trajectoryPrinter.loadIntrestingPoint(intrestingPointSet)
+    # 绘制兴趣点
+    intrestingPointSet = np.loadtxt("my_project\scripts\Data\intrestingPoint.txt")
+    trajectoryPrinter.loadIntrestingPoint(intrestingPointSet)
 
-    # # # 绘制原始轨迹
-    # oriTrajectory = np.loadtxt("my_project\scripts\oriTraj.txt")
-    # trajectoryPrinter.loadTrajectory(oriTrajectory, 'original','k', '--')
+    # # 绘制原始轨迹
+    oriTrajectory = np.loadtxt("my_project\scripts\oriTraj.txt")
+    trajectoryPrinter.loadTrajectory(oriTrajectory, 'original','k', '--')
 
-    # # # 绘制纯人控制的实际轨迹
+    # # 绘制纯人控制的实际轨迹
     # humanTrajectory = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-allHuman-realTraj-2.txt")
     # trajectoryPrinter.loadTrajectory(humanTrajectory, 'human leading', 'orange')
 
-    # # # 绘制改变后的期望轨迹
+    # # 绘制改变后的期望轨迹
     # index = 2
     # expectTrajectory1 = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-CHANGETraj-1-change-"+str(index)+".txt")
-    # trajectoryPrinter.loadTrajectory(expectTrajectory1,'the second replanning', 'k', '--')
+    # trajectoryPrinter.loadTrajectory(expectTrajectory1,'the second replanning', 'limegreen', '--')
 
-    # index = 1
-    # expectTrajectory2 = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-CHANGETraj-1-change-"+str(index)+".txt")
-    # trajectoryPrinter.loadTrajectory(expectTrajectory2, 'the first replanning', 'limegreen', '--')
+    index = 1
+    expectTrajectory2 = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-CHANGETraj-1-change-"+str(index)+".txt")
+    trajectoryPrinter.loadTrajectory(expectTrajectory2, 'the first replanning', 'limegreen', '--')
 
-    # # print(checkTrajectoryDifference(expectTrajectory1, expectTrajectory2))
+    # print(checkTrajectoryDifference(expectTrajectory1, expectTrajectory2))
 
-    # # # 绘制算法辅助的实际轨迹
-    # replanTrajectory = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-realTraj-2.txt")
-    # trajectoryPrinter.loadTrajectory(replanTrajectory, 'shared control', 'b')
+    replanPoint = checkTrajectoryDifference(expectTrajectory2, oriTrajectory)
+    print(replanPoint)
+    trajectoryPrinter.loadChangePoint(oriTrajectory, replanPoint)
+
+    # # 绘制算法辅助的实际轨迹
+    replanTrajectory = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-realTraj-1.txt")
+    trajectoryPrinter.loadTrajectory(replanTrajectory, 'actual trajectory', 'b', '-', replanPoint)
 
     # 绘制障碍物
-    # for i in range(3):
-    #     obstacle = np.loadtxt("my_project\scripts\Data\obstacle" + str(i))
-    #     trajectoryPrinter.loadObstacle(obstacle)
+    for i in range(3):
+        obstacle = np.loadtxt("my_project\scripts\Data\obstacle" + str(i))
+        trajectoryPrinter.loadObstacle(obstacle)
 
-    # trajectoryPrinter.print()
+    trajectoryPrinter.print()
 
     #=========================================================# # 画交互力图——方案对比
 
@@ -261,48 +276,48 @@ if __name__ == "__main__":
 
     #=========================================================# # 画交互力图——对比一致性
 
-    fig = plt.figure()
-    totalLength = 580
-    threshold = 3.7
-    controllerFreq = 10
-    t = np.arange(0, totalLength/controllerFreq, 1/controllerFreq) 
+    # fig = plt.figure()
+    # totalLength = 580
+    # threshold = 3.7
+    # controllerFreq = 10
+    # t = np.arange(0, totalLength/controllerFreq, 1/controllerFreq) 
 
-    colorSet = ['orange', 'b', 'limegreen', 'r']
-    forceSUM = np.zeros(totalLength)
+    # colorSet = ['orange', 'b', 'limegreen', 'r']
+    # forceSUM = np.zeros(totalLength)
 
-    ax1 = plt.subplot(211)
-    for human in range(1, 5):
-        times = 2
-        force = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-allHuman-forceSet-" + str(times) + ".txt")
-        forceSUM += force[:totalLength]
-        ax1.plot(t, force[:totalLength], colorSet[human-1], linewidth=1, label='human'+ str(human), linestyle='dotted')
+    # ax1 = plt.subplot(211)
+    # for human in range(1, 5):
+    #     times = 2
+    #     force = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-allHuman-forceSet-" + str(times) + ".txt")
+    #     forceSUM += force[:totalLength]
+    #     ax1.plot(t, force[:totalLength], colorSet[human-1], linewidth=1, label='human'+ str(human), linestyle='dotted')
 
-    # ax1.plot(t, forceSUM/4, 'k', linewidth=1, label='mean', linestyle='-')
+    # # ax1.plot(t, forceSUM/4, 'k', linewidth=1, label='mean', linestyle='-')
 
-    ax1.legend(loc='upper right')
-    ax1.set_ylabel('force (N)')
-    ax1.set_xlabel('time (s)')
+    # ax1.legend(loc='upper right')
+    # ax1.set_ylabel('force (N)')
+    # ax1.set_xlabel('time (s)')
 
-    forceSUM = np.zeros(totalLength)
-    ax2 = plt.subplot(212)
-    for human in range(1, 5):
-        times = 2
-        force = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-forceSet-" + str(times) + ".txt")
-        forceSUM += force[:totalLength]
-        ax2.plot(t, force[:totalLength], colorSet[human-1], linewidth=1, label='human'+ str(human), linestyle='dotted')
+    # forceSUM = np.zeros(totalLength)
+    # ax2 = plt.subplot(212)
+    # for human in range(1, 5):
+    #     times = 2
+    #     force = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-forceSet-" + str(times) + ".txt")
+    #     forceSUM += force[:totalLength]
+    #     ax2.plot(t, force[:totalLength], colorSet[human-1], linewidth=1, label='human'+ str(human), linestyle='dotted')
 
-    # ax2.plot(t, forceSUM/4, 'k', linewidth=1, label='sum', linestyle='-')
-    ax2.plot(t, np.ones(totalLength) * threshold, 'k', linestyle='--', linewidth=1)
+    # # ax2.plot(t, forceSUM/4, 'k', linewidth=1, label='sum', linestyle='-')
+    # ax2.plot(t, np.ones(totalLength) * threshold, 'k', linestyle='--', linewidth=1)
 
-    ax2.legend(loc='upper right')     
-    ax2.set_ylabel('force (N)')
-    ax2.set_xlabel('time (s)')  
+    # ax2.legend(loc='upper right')     
+    # ax2.set_ylabel('force (N)')
+    # ax2.set_xlabel('time (s)')  
     
-    # plt.show()
+    # # plt.show()
 
-    # 保存图片
-    fig.set_size_inches(10, 4)
-    plt.savefig("my_project\scripts\Data\\" + str(human) + "-forceContrast.png", dpi=300)
+    # # 保存图片
+    # fig.set_size_inches(10, 4)
+    # plt.savefig("my_project\scripts\Data\\" + str(human) + "-forceContrast.png", dpi=300)
 
     #=========================================================# # 计算兴趣点误差
 
