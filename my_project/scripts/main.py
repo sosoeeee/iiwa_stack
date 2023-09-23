@@ -11,7 +11,7 @@ from RRT_PathPlanner import PathPlanner
 
 from controller import *
     
-usr = 5
+usr = 7
 times = 2
 mode = ["replan", "allHuman"]
 curMode = mode[0]
@@ -129,7 +129,7 @@ path = pathPLanner.RRT(True)
 # at = np.array([0, 0, 0]).reshape((3, 1))
 # miniJerkTrajPlanner = MinimumTrajPlanner(path, avrSpeed, controllerFreq, v0, a0, vt, at, 3)
 # traj = miniJerkTrajPlanner.computeTraj()
-# # np.savetxt("oriTraj.txt", traj)
+# np.savetxt("oriTraj.txt", traj)
 # controller.publishRobotTrajectory(traj)
 # print("trajectory planning is done")
 
@@ -137,10 +137,11 @@ traj = np.loadtxt('oriTraj.txt')
 controller.publishRobotTrajectory(traj)
 
 # 添加人类兴趣点
-pointSet = np.array([-0.6, -0.18, 0.2]).reshape(3, 1)
-pointSet = np.hstack((pointSet, np.array([-0.56, 0.07, 0.2]).reshape(3, 1)))
-pointSet = np.hstack((pointSet, np.array([-0.57, 0.04, 0.2]).reshape(3, 1)))
-pointSet = np.hstack((pointSet, np.array([-0.59, -0.25, 0.2]).reshape(3, 1)))
+pointSet = np.array([-0.57, -0.005, 0.2]).reshape(3, 1)
+# pointSet = np.array([-0.6, -0.18, 0.2]).reshape(3, 1)
+# pointSet = np.hstack((pointSet, np.array([-0.55, 0.07, 0.2]).reshape(3, 1)))
+# pointSet = np.hstack((pointSet, np.array([-0.56, 0.04, 0.2]).reshape(3, 1)))
+# pointSet = np.hstack((pointSet, np.array([-0.59, -0.25, 0.2]).reshape(3, 1)))
 controller.publishHumanTrajectory(pointSet)
 
 ##########################################################################
@@ -222,7 +223,8 @@ while not rospy.is_shutdown():
     # 数据收集
     forceSet = np.vstack((forceSet, np.array([stickForce[0], stickForce[1]]).reshape((1, 2))))
     distanceSet = np.vstack((distanceSet, np.array([stickPos[0], stickPos[1]]).reshape((1, 2))))
-    PSISet.append(PSI)
+    if curMode == 'replan':
+        PSISet.append(PSI)
     realTraj = np.vstack((realTraj, w[0:3, 0].reshape((1, 3))))
     
     controller.rate.sleep()
@@ -233,6 +235,7 @@ PSISet = np.array(PSISet).reshape((-1, 1))
 np.savetxt("Data/%d-%s-forceSet-%d.txt" % (usr, curMode, times), forceSet, fmt='%.4f')
 np.savetxt("Data/%d-%s-distanceSet-%d.txt" % (usr, curMode, times), distanceSet, fmt='%.4f')
 np.savetxt("Data/%d-%s-realTraj-%d.txt" % (usr, curMode, times), realTraj)
-np.savetxt("Data/%d-%s-PSISet-%d.txt" % (usr, curMode, times), PSISet, fmt='%.4f')
+if curMode == 'replan':
+    np.savetxt("Data/%d-%s-PSISet-%d.txt" % (usr, curMode, times), PSISet, fmt='%.4f')
 print("--------------END--------------")
 print("SAVE DATA")

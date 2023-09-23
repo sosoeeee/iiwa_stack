@@ -197,6 +197,8 @@ class sharedController:
 
         self.lambda_ = np.sqrt(d_res ** 2 - d_sat ** 2) / d_res
 
+        # self.lambda_ = 0.8 # 测试PSI为恒定值
+
         return self.lambda_
 
         # self.lambda_ = 1

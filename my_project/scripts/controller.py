@@ -173,7 +173,7 @@ class Controller:
             self.ObstacleSet[0]['radius'] = radius
             self.ObstacleSet[0]['state'] = 1
 
-            # self.publishObstacle(0) # 实时更新
+            self.publishObstacle(0) # 实时更新
     
     # 设置障碍物2的状态更新
     def obstacle_2_callBack(self, msg):
@@ -196,7 +196,7 @@ class Controller:
             self.ObstacleSet[1]['radius'] = radius
             self.ObstacleSet[1]['state'] = 1
 
-            # self.publishObstacle(1) # 实时更新
+            self.publishObstacle(1) # 实时更新
 
     # 设置障碍物3的状态更新
     def obstacle_3_callBack(self, msg):
@@ -216,10 +216,10 @@ class Controller:
 
         if np.linalg.norm(center - centerLast) > 0.01:
             self.ObstacleSet[2]['center'] = center
-            self.ObstacleSet[2]['radius'] = radius
+            self.ObstacleSet[2]['radiucls'] = radius
             self.ObstacleSet[2]['state'] = 1
 
-            # self.publishObstacle(2) # 实时更新
+            self.publishObstacle(2) # 实时更新
 
     # 更新障碍物index在monitor中的显示的位置
     def publishObstacle(self, index):
@@ -229,7 +229,7 @@ class Controller:
         radius = self.ObstacleSet[index]['radius']
 
         msg = np.array([x, y, z, radius])
-        np.savetxt("obstacle%d" % index, msg)
+        np.savetxt("obstacle_PSI%d" % index, msg)
 
         msg = str(x) + ',' + str(y) + ',' + str(z) + ',' + str(radius)
 
