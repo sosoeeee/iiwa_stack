@@ -15,11 +15,14 @@ class TrajectoryPrinter:
         plt.ylabel('y (m)')
         
 
-    def loadTrajectory(self, trajectory, Label, color, Linestyle='-', endIndex=-1):
+    def loadTrajectory(self, trajectory, Label, color, Linestyle='-', endIndex=-1, startIndex=1):
+        if trajectory.shape[1] == 3:
+            trajectory = trajectory.T
+
         print(trajectory.shape)
 
         # 绘制轨迹并设置粗细
-        plt.plot(trajectory[0, :endIndex], trajectory[1, :endIndex], color, linestyle=Linestyle, linewidth=1, label=Label)
+        plt.plot(trajectory[0, startIndex:endIndex], trajectory[1, startIndex:endIndex], color, linestyle=Linestyle, linewidth=1, label=Label)
         plt.legend(loc='upper right')
 
 
@@ -35,7 +38,7 @@ class TrajectoryPrinter:
         circleRadius = np.sqrt(sphereRadius**2 - dz**2)
 
          # 生成圆形轨迹
-        theta = np.arange(0, 2*np.pi, 0.1)
+        theta = np.arange(0, 2*np.pi + 0.1, 0.1)
         x = x + circleRadius * np.cos(theta)
         y = y + circleRadius * np.sin(theta)
 
@@ -43,22 +46,25 @@ class TrajectoryPrinter:
         plt.plot(x, y, 'grey', linewidth=1)
     
     def loadIntrestingPoint(self, point):
-        plt.plot(point[:, 0], point[:, 1], 'r.', markersize=5)
+        plt.plot(point[:, 0], point[:, 1], 'r.', markersize=6)
 
-    def loadChangePoint(self, trajectory, index):
+    def loadReplanPoint(self, trajectory, index):
         # 绘制点
         replanLen = 250 
-        # 使用橙色星形绘制改变点
+        # 使用星形绘制改变点
         plt.plot(trajectory[0][index], trajectory[1][index], 'black', marker='*', markersize=10)
         plt.plot(trajectory[0][index + replanLen], trajectory[1][index + replanLen], 'black', marker='*', markersize=10)
 
         controllerFreq = 10
         time = index / controllerFreq
         time = 'time: ' + str(time) + 's'
-        plt.text(trajectory[0][index] - 0.16, trajectory[1][index] - 0.01, time, fontsize=8)
-
+        plt.text(trajectory[0][index] - 0.16, trajectory[1][index], time, fontsize=8)
+    
     def print(self):
         plt.show()
+    
+    def save(self, fileName):
+        plt.savefig('my_project\scripts\pic\\' + fileName + '.pdf')
 
 class ForcePrinter:
     def __init__(self, totalLength, threshold):
@@ -75,11 +81,14 @@ class ForcePrinter:
         # 设置y名称
         plt.ylabel('force (N)')
 
-        controllerFreq = 10
-        self.t = np.arange(0, self.totalLength/controllerFreq, 1/controllerFreq)
+        self.controllerFreq = 10
+        self.t = np.arange(0, self.totalLength/self.controllerFreq, 1/self.controllerFreq)
         
     def loadForce(self, force, color, Label, Linestyle='-'):
         print(force.shape)
+
+        # if force.shape[1] == 2:
+        #     force = np.sqrt(force[:, 0] ** 2 + force[:, 1] ** 2)
 
         # 绘制轨迹并设置粗细, 设置绘制在第二幅图
         plt.plot(self.t, force[:self.totalLength], color, linewidth=1, label=Label, linestyle=Linestyle)
@@ -88,22 +97,44 @@ class ForcePrinter:
         # 绘制轨迹散点
         # plt.plot(self.t, force[:self.totalLength], color + '.', markersize=5)
 
+    def loadBackgroud(self, startIndex, endIndex):
+        # 绘制背景
+        plt.axvspan(startIndex/self.controllerFreq, endIndex/self.controllerFreq, facecolor='grey', alpha=0.2)
+
     def loadChangePoint(self, index):
         # 绘制点
-        plt.plot(self.t[index], self.threshold, 'r.', markersize=5)
+        plt.plot(self.t[index], self.threshold, 'black', marker='*', markersize=10)
+
+        # 标记时间
+        time = index / self.controllerFreq
+        time = 'time: ' + str(time) + 's'
+
+        if index == 201:
+            compensation = 0.2
+        else:
+            compensation = 0
+
+        plt.text(self.t[index] - 1, self.threshold + 0.3 + compensation, time, fontsize=8)
 
     def loadThreshold(self):
         # 使用虚线绘制阈值
         plt.plot(self.t, np.ones(self.totalLength) * self.threshold, 'k', linestyle='--', linewidth=1)
+        # 文字标记
+        plt.text(0, self.threshold + 0.1, str(self.threshold) + 'N', fontsize=8)
 
     def print(self):
         plt.show()
+    
+    def save(self, fileName):
+        plt.savefig('my_project\scripts\pic\\' + fileName + '.pdf')
+
 
 
 def calculatePointError(trajectory, pointSet):
     amount = pointSet.shape[0]
 
     error = np.zeros(amount)
+    pointIndex = np.zeros(amount, int)
 
     for i in range(amount):
         error[i] = 999
@@ -113,9 +144,10 @@ def calculatePointError(trajectory, pointSet):
             error_ = np.linalg.norm(trajectory[:2, j].T - pointSet[i, :])
             if error_ < error[i]:
                 error[i] = error_
+                pointIndex[i] = j
     
     # print(error)
-    return error
+    return error, pointIndex
 
 # 返回轨迹改变的点的第一个索引(计算重规划开始的起点)
 def checkTrajectoryDifference(trajectory1, trajectory2):
@@ -124,6 +156,27 @@ def checkTrajectoryDifference(trajectory1, trajectory2):
     for i in range(amount):
         if np.linalg.norm(trajectory1[:2, i].T - trajectory2[:2, i].T) > 0:
             return i
+
+def checkTrajectoryDifferenceALL(trajectory1, trajectory2):
+    amount = trajectory1.shape[1]
+    indexSet = []
+
+    for i in range(1, amount):
+        if 0.005 < np.linalg.norm(trajectory1[:2, i].T - trajectory2[:2, i].T)<0.02:
+            indexSet.append(i)
+
+    print(indexSet)    
+
+    return indexSet
+
+def getTrajectoryDifferenceALL(trajectory1, trajectory2):
+    amount = trajectory1.shape[1]
+    dif = np.zeros(amount)
+
+    for i in range(amount):
+        dif[i] = np.linalg.norm(trajectory1[:2, i].T - trajectory2[:2, i].T) 
+
+    return dif
 
 def sampleVariance(group):
     n = group.shape[0] # 样本数
@@ -167,62 +220,220 @@ def OneFactorANOVA(group1, group2):
 
 if __name__ == "__main__":
     #=========================================================# # 画轨迹图
-    human = 5
-    initZ = 0.20458
-    trajectoryPrinter = TrajectoryPrinter(initZ)
+    # human = 5
+    # initZ = 0.20458
+    # trajectoryPrinter = TrajectoryPrinter(initZ)
 
     # 绘制兴趣点
-    intrestingPointSet = np.loadtxt("my_project\scripts\Data\intrestingPoint.txt")
-    trajectoryPrinter.loadIntrestingPoint(intrestingPointSet)
+    # intrestingPointSet = np.loadtxt("my_project\scripts\Data\intrestingPoint.txt")
+    # trajectoryPrinter.loadIntrestingPoint(intrestingPointSet)
 
-    # # 绘制原始轨迹
-    oriTrajectory = np.loadtxt("my_project\scripts\oriTraj.txt")
-    trajectoryPrinter.loadTrajectory(oriTrajectory, 'original','k', '--')
+    # 绘制纯人控制的实际轨迹
+    # humanTrajectory = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-allHuman-realTraj-1.txt")
 
-    # # 绘制纯人控制的实际轨迹
-    # humanTrajectory = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-allHuman-realTraj-2.txt")
-    # trajectoryPrinter.loadTrajectory(humanTrajectory, 'human leading', 'orange')
+    # 绘制原始轨迹
+    # oriTrajectory = np.loadtxt("my_project\scripts\oriTraj.txt")
+    # trajectoryPrinter.loadTrajectory(oriTrajectory, 'original','k', '--')
+    # trajectoryPrinter.loadTrajectory(humanTrajectory, 'master-slave', 'orange','--')
 
     # # 绘制改变后的期望轨迹
     # index = 2
     # expectTrajectory1 = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-CHANGETraj-1-change-"+str(index)+".txt")
-    # trajectoryPrinter.loadTrajectory(expectTrajectory1,'the second replanning', 'limegreen', '--')
+    # trajectoryPrinter.loadTrajectory(expectTrajectory1,'the second replanning', 'k', '--')
 
-    index = 1
-    expectTrajectory2 = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-CHANGETraj-1-change-"+str(index)+".txt")
-    trajectoryPrinter.loadTrajectory(expectTrajectory2, 'the first replanning', 'limegreen', '--')
+    # index = 3
+    # expectTrajectory2 = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-CHANGETraj-1-change-"+str(index)+".txt")
+    # trajectoryPrinter.loadTrajectory(expectTrajectory2, 'the third replanning', 'limegreen', '--')
 
     # print(checkTrajectoryDifference(expectTrajectory1, expectTrajectory2))
-
-    replanPoint = checkTrajectoryDifference(expectTrajectory2, oriTrajectory)
-    print(replanPoint)
-    trajectoryPrinter.loadChangePoint(oriTrajectory, replanPoint)
+# 
+    # replanPoint = checkTrajectoryDifference(expectTrajectory1, expectTrajectory2)
+    # print(replanPoint)
+    # trajectoryPrinter.loadReplanPoint(expectTrajectory1, replanPoint)
 
     # # 绘制算法辅助的实际轨迹
-    replanTrajectory = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-realTraj-1.txt")
-    trajectoryPrinter.loadTrajectory(replanTrajectory, 'actual trajectory', 'b', '-', replanPoint)
+    # replanTrajectory = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-realTraj-1.txt")
+    # trajectoryPrinter.loadTrajectory(replanTrajectory, 'real-time', 'b','-', replanPoint)
+
+    # 绘制时间戳
+    # shared [81, 153, 213, 471]
+    # ml [82, 179, 261, 546]
+    # controllerFreq = 10
+    # timeStampIndex = checkTrajectoryDifferenceALL(humanTrajectory.T, oriTrajectory)
+    # timeStampIndex = [81, 153, 213, 471]
+    # for index in timeStampIndex:
+    #     plt.plot(replanTrajectory.T[0][index], replanTrajectory.T[1][index], 'black', marker='.', markersize=6)
+    #     time = index / controllerFreq
+    #     time = 'time: ' + str(time) + 's'
+
+    #     if index == 81:
+    #         plt.text(oriTrajectory[0][index] - 0.1, oriTrajectory[1][index] + 0.02, time, fontsize=8)
+    #     elif index == 471:
+    #         plt.text(oriTrajectory[0][index] + 0.02, oriTrajectory[1][index] + 0.02, time, fontsize=8)
+    #     else:
+    #         plt.text(oriTrajectory[0][index] - 0.12, oriTrajectory[1][index], time, fontsize=8)
+
+        # if index == 82:
+        #     plt.text(oriTrajectory[0][index] - 0.1, oriTrajectory[1][index] + 0.02, time, fontsize=8)
+        # else:
+        #     plt.text(oriTrajectory[0][index] - 0.12, oriTrajectory[1][index], time, fontsize=8)
+            
+            
+
+        # plt.text(oriTrajectory[0][index] - 0.12, oriTrajectory[1][index], time, fontsize=8)
+
+
 
     # 绘制障碍物
-    for i in range(3):
-        obstacle = np.loadtxt("my_project\scripts\Data\obstacle" + str(i))
-        trajectoryPrinter.loadObstacle(obstacle)
+    # for i in range(3):
+    #     obstacle = np.loadtxt("my_project\scripts\Data\obstacle" + str(i))
+    #     trajectoryPrinter.loadObstacle(obstacle)
 
-    trajectoryPrinter.print()
+    # trajectoryPrinter.print()
+    # trajectoryPrinter.save("replan-3")
+
+    #=========================================================# # PSI测试
+    # human = 7
+    # initZ = 0.20458
+    # trajectoryPrinter = TrajectoryPrinter(initZ)
+
+    # intrestingPointSet = np.array([[-0.57, -0.005]])
+    # trajectoryPrinter.loadIntrestingPoint(intrestingPointSet)
+
+    # startIndex = 100
+    # endIndex = 300
+
+    # oriTrajectory = np.loadtxt("my_project\scripts\oriTraj.txt")
+    # trajectoryPrinter.loadTrajectory(oriTrajectory, 'original','k', '-', endIndex, startIndex)
+
+    # ConstantPSI = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-realTraj-1.txt")
+    # trajectoryPrinter.loadTrajectory(ConstantPSI, 'Constant PSI', '#8f17da','--', endIndex, startIndex)
+
+    # variablePSI = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-realTraj-2.txt")
+    # trajectoryPrinter.loadTrajectory(variablePSI, 'Variable PSI', '#62da17','--', endIndex, startIndex)
+
+    # #  绘制障碍物
+    # obstacle = np.loadtxt("my_project\scripts\Data\obstacle_PSI" + str(0))
+    # trajectoryPrinter.loadObstacle(obstacle)
+
+    # # 设置label位置
+    # plt.legend(loc='upper left')
+
+    # # trajectoryPrinter.print()
+    # trajectoryPrinter.save("PSITrajectory")
+
+    # # 绘制力曲线
+    # forcePrinter = ForcePrinter(endIndex - startIndex - 1, 3.7)
+
+    # plt.subplot(311)
+
+    # force_ConstantPSI = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-forceSet-" + str(1) + ".txt")
+    # force_ConstantPSI = force_ConstantPSI[startIndex:endIndex]
+    # forcePrinter.loadForce(force_ConstantPSI, '#8f17da', 'Constant PSI')
+
+    # force_variablePSI = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-forceSet-" + str(2) + ".txt")
+    # force_variablePSI = force_variablePSI[startIndex:endIndex]
+    # forcePrinter.loadForce(force_variablePSI, '#62da17', 'Variable PSI')
+
+    # forcePrinter.loadThreshold()
+
+    # # 设置label位置
+    # plt.legend(loc='lower right')
+    # plt.ylim(-0.5, 4.5)
+    # plt.ylabel('force (N)')
+
+    # # forcePrinter.print()
+
+    # totalLength = endIndex - startIndex 
+    # controllerFreq = 10
+    # t = np.arange(0, totalLength/controllerFreq, 1/controllerFreq)
+
+    # # 绘制轨迹偏离曲线
+    # plt.subplot(312)
+    # oriTrajectory = oriTrajectory[:, startIndex:endIndex]
+    # ConstantPSI = ConstantPSI[startIndex:endIndex, :]
+    # variablePSI = variablePSI[startIndex:endIndex, :]
+
+    # dif_ConstantPSI = getTrajectoryDifferenceALL(oriTrajectory, ConstantPSI.T)
+    # dif_variablePSI = getTrajectoryDifferenceALL(oriTrajectory, variablePSI.T)
+
+    # plt.plot(t, dif_ConstantPSI, '#8f17da', linewidth=1, label='Constant PSI', linestyle='-')
+    # plt.plot(t, dif_variablePSI, '#62da17', linewidth=1, label='Variable PSI', linestyle='-')
+
+    # # 设置label位置
+    # plt.legend(loc='upper left')
+    # plt.ylabel('error (m)')
+    # # plt.show()
+
+
+    # # 绘制PSI曲线
+    # plt.subplot(313)
+
+    # PSI_variablePSI = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-PSISet-" + str(2) + ".txt")
+    # PSI_variablePSI = PSI_variablePSI[startIndex:endIndex]
+    # plt.plot(t, PSI_variablePSI, '#62da17', linewidth=1, label='Variable PSI', linestyle='-')
+
+    # PSI_ConstantPSI = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-PSISet-" + str(1) + ".txt")
+    # PSI_ConstantPSI = PSI_ConstantPSI[startIndex:endIndex]
+    # plt.plot(t, PSI_ConstantPSI, '#8f17da', linewidth=1, label='Constant PSI', linestyle='-')
+
+    # plt.legend(loc='lower left')
+    # plt.ylim(0, 1.1)
+    # plt.ylabel('PSI')
+    # plt.xlabel('time (s)')
+    # # plt.show()
+
+    # plt.savefig('my_project\scripts\pic\\' + "PSI" + '.pdf')
 
     #=========================================================# # 画交互力图——方案对比
-
+    # human = 5
+    # times = 1
     # forcePrinter = ForcePrinter(600, 3.7) 
-    # force = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-allHuman-forceSet-" + str(times+1) + ".txt")
-    # forcePrinter.loadForce(force, 'orange', 'human leading')
+    # # plt.subplot(3, 1, 2)
+    # # force = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-allHuman-forceSet-" + str(times) + ".txt")
+    # # forcePrinter.loadForce(force, 'orange', 'master-slave')
+    # # forcePrinter.loadBackgroud(82, 179)
+    # # force1Sum = np.sum(force[82:179])
+    # # forcePrinter.loadBackgroud(261, 546)
+    # # force2Sum = np.sum(force[261:546])
+    # # plt.ylabel('force (N)')
+    # # plt.ylim(-0.2, 5.5)
 
+    # # plt.legend(loc='right')
+
+    # # plt.subplot(3, 1, 3)
     # force = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-forceSet-" + str(times) + ".txt")
     # forcePrinter.loadForce(force, 'b', 'shared control')
+    # forcePrinter.loadThreshold()
+    # # forcePrinter.loadBackgroud(81, 153)
+    # # force1Sum_share = np.sum(force[81:153])
+    # # forcePrinter.loadBackgroud(213, 471)
+    # # force2Sum_share = np.sum(force[213:471])
+    # # plt.legend(loc='right')
+
+    # forcePrinter.loadChangePoint(131)
+    # forcePrinter.loadChangePoint(201)
+    # forcePrinter.loadChangePoint(231)
+
+    # # print("1:", abs(force1Sum_share - force1Sum) / force1Sum) # 21.51%
+    # # print("2:", abs(force2Sum_share - force2Sum) / force2Sum) # 52.83%
+
+    # # 设置y轴范围
+    # plt.ylim(-0.2, 5.5)
+    # # 设置x名称
+    # plt.xlabel('time (s)')
+    # # 设置y名称
+    # plt.ylabel('force (N)')
+
+    # # force = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-forceSet-" + str(times) + ".txt")
+    # # forcePrinter.loadForce(force, 'b', 'shared control')
 
     # changeIndex = [131, 201, 231]
     # for index in changeIndex:
     #     forcePrinter.loadChangePoint(index)
 
-    # forcePrinter.print()
+    # # forcePrinter.print()
+    # forcePrinter.save("replan-force")
 
     #=========================================================# # 画交互力图——对比一致性
 
@@ -318,6 +529,37 @@ if __name__ == "__main__":
     # # 保存图片
     # fig.set_size_inches(10, 4)
     # plt.savefig("my_project\scripts\Data\\" + str(human) + "-forceContrast.png", dpi=300)
+
+    #=========================================================# # 计算兴趣点折线图
+    # human = 6
+    # times = 1
+    # intrestingPointSet = np.loadtxt("my_project\scripts\Data\intrestingPoint.txt")
+    # humanTrajectory = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-allHuman-realTraj-1.txt")
+    # replanTrajectory = np.loadtxt("my_project\scripts\Data\\" + str(human) + "-replan-realTraj-1.txt")
+    # humanErr, humanIndex = calculatePointError(humanTrajectory.T, intrestingPointSet)
+    # shareErr, shareIndex = calculatePointError(replanTrajectory.T, intrestingPointSet)
+    # print(humanErr, humanIndex)
+    # print(shareErr, shareIndex)
+
+    # # 绘制折线图
+    # plt.subplot(3, 1, 1)
+    # # fig = plt.figure()
+    # plt.plot(humanErr * 1000, 'orange', linewidth=1, label='master-slave', linestyle='-')
+    # plt.plot(shareErr * 1000, 'b', linewidth=1, label='shared control', linestyle='-')
+    # plt.legend(loc='upper left')
+    # plt.ylabel('error (mm)')
+
+    # # 绘制点
+    # pointIndex = [0, 1,2,3]
+    # plt.plot(pointIndex, humanErr[pointIndex] * 1000, 'orange', marker='.', markersize=5)
+    # plt.plot(pointIndex, shareErr[pointIndex] * 1000, 'b', marker='.', markersize=5)
+
+    # plt.ylim(-0.2, 5)
+    # # 设置x轴显示1，2，3，4
+    # plt.xticks(pointIndex, ('Point1', 'Point2', 'Point3', 'Point4'))
+
+    # # plt.show()
+    # plt.savefig("my_project\scripts\pic\\" + "contrast" + '.pdf')
 
     #=========================================================# # 计算兴趣点误差
 

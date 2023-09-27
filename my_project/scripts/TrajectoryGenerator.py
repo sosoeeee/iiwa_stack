@@ -146,6 +146,7 @@ class MinimumTrajPlanner:
 
         # 路径点的时刻
         self.ts = None
+        # 轨迹总时间
         self.T = None
 
         # 轨迹阶数
@@ -280,11 +281,21 @@ class MinimumTrajPlanner:
 
         t = np.arange(t1, t2, dt)
         n = ploys.shape[0]
-        traj = ploys[0, 0] * np.ones(len(t))
+        trajPos = ploys[0, 0] * np.ones(len(t))
         for i in range(1, n):
-            traj = traj + ploys[i, 0] * t ** i
+            trajPos = trajPos + ploys[i, 0] * t ** i
 
-        return traj
+        # # debug
+        # t_d = np.array([t1, t2])
+        # trajPos_d = ploys[0, 0] * np.ones(len(t_d))
+        # for i in range(1, n):
+        #     trajPos_d = trajPos_d + ploys[i, 0] * t_d ** i
+        #
+        # for i in range(len(t_d)):
+        #     print(format(t_d[i], '.2f'), end=':')
+        #     print(format(trajPos_d[i], '.2f'))
+
+        return trajPos
 
     # 计算轨迹速度[0, 1, 2t, 3t^2, ... , nt^(n-1)]
     def polys_d_vals(self, ploys, t1, t2, dt):
@@ -296,11 +307,48 @@ class MinimumTrajPlanner:
 
         t = np.arange(t1, t2, dt)
         n = ploys.shape[0]
-        traj = np.zeros(len(t))
+        trajVel = np.zeros(len(t))
         for i in range(1, n):
-            traj = traj + i * ploys[i, 0] * t ** (i - 1)
+            trajVel = trajVel + i * ploys[i, 0] * t ** (i - 1)
 
-        return traj
+        # debug
+        t_d = np.array([t1, t2])
+        trajVel_d = np.zeros(len(t_d))
+        for i in range(1, n):
+            trajVel_d = trajVel_d + i * ploys[i, 0] * t_d ** (i - 1)
+
+        for i in range(1, len(t_d)):
+            print(format(t_d[i], '.2f'), end=':')
+            print(format(trajVel_d[i], '.2f'))
+
+        return trajVel
+    
+    # 计算轨迹加速度[0, 0, 2, 6t, ... , n(n-1)t^(n-2)]
+    def polys_dd_vals(self, ploys, t1, t2, dt):
+        # 检查ploys是否为n*1
+        ploys = ploys.reshape(-1, 1)
+        if ploys.shape[1] != 1:
+            print('ploys shape error')
+            return None
+        
+        t = np.arange(t1, t2, dt)
+        n = ploys.shape[0]
+        trajAcc = np.zeros(len(t))
+        for i in range(2, n):
+            trajAcc = trajAcc + ploys[i, 0] * i * (i - 1) * t ** (i - 2)
+
+        # debug
+        # t_d = np.array([t1, t2])
+        # trajAcc_d = np.zeros(len(t_d))
+        # for i in range(2, n):
+        #     trajAcc_d = trajAcc_d + ploys[i, 0] * i * (i - 1) * t_d ** (i - 2)
+        #
+        # for i in range(len(t_d)):
+        #     print(format(t_d[i], '.2f'), end=':')
+        #     print(format(trajAcc_d[i], '.2f'))
+
+        return trajAcc
+ 
 
     def computeTraj(self):
         # 检查path是否为3*n
@@ -340,3 +388,35 @@ class MinimumTrajPlanner:
         trajectory = np.vstack((x, y, z, vx, vy, vz))
 
         return trajectory
+    
+    def computeTrajAcc(self):
+        # 检查path是否为3*n
+        if self.path.shape[0] != 3:
+            print('path shape error')
+            return None
+
+        self.arrangeT()
+
+        # 计算多项式系数
+        polys_x = self.computeSingleAxisTraj(self.path[0, :], self.v0[0, 0], self.a0[0, 0], self.vt[0, 0],
+                                             self.at[0, 0])
+        polys_y = self.computeSingleAxisTraj(self.path[1, :], self.v0[0, 1], self.a0[0, 1], self.vt[0, 1],
+                                             self.at[0, 1])
+        polys_z = self.computeSingleAxisTraj(self.path[2, :], self.v0[0, 2], self.a0[0, 2], self.vt[0, 2],
+                                             self.at[0, 2])
+
+        # 计算轨迹
+        n_seg = self.path.shape[1] - 1
+
+        ax = self.polys_dd_vals(polys_x[:, 0], self.ts[0], self.ts[1], 1 / self.Freq)
+        ay = self.polys_dd_vals(polys_y[:, 0], self.ts[0], self.ts[1], 1 / self.Freq)
+        az = self.polys_dd_vals(polys_z[:, 0], self.ts[0], self.ts[1], 1 / self.Freq)
+
+        for i in range(1, n_seg):
+            ax = np.hstack((ax, self.polys_dd_vals(polys_x[:, i], self.ts[i], self.ts[i + 1], 1 / self.Freq)))
+            ay = np.hstack((ay, self.polys_dd_vals(polys_y[:, i], self.ts[i], self.ts[i + 1], 1 / self.Freq)))
+            az = np.hstack((az, self.polys_dd_vals(polys_z[:, i], self.ts[i], self.ts[i + 1], 1 / self.Freq)))
+
+        trajectoryAcc = np.vstack((ax, ay, az))
+
+        return trajectoryAcc

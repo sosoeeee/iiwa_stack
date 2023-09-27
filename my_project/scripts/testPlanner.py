@@ -38,12 +38,10 @@ for i in range(len(PathPlanner.obstacle)):
     z = obstacle['radius'] * np.outer(np.ones(np.size(u)), np.cos(v)) + obstacle['center'][2]
     ax.plot_surface(x, y, z, color='g')
 
-# 绘制路径
+# # 绘制路径
 for i in range(path.shape[1] - 1):
     # 绘制直线
-    ax.plot([path[0, i], path[0, i + 1]], [path[1, i], path[1, i + 1]], [path[2, i], path[2, i + 1]], c='r')
-
-plt.show()
+    ax.plot([path[0, i], path[0, i + 1]], [path[1, i], path[1, i + 1]], [path[2, i], path[2, i + 1]], 'black', marker='.', markersize=3)
 
 print(path)
 # 轨迹规划
@@ -54,12 +52,33 @@ v0 = np.array([0, 0, 0]).reshape((3, 1))
 a0 = np.array([0, 0, 0]).reshape((3, 1))
 vt = np.array([0, 0, 0]).reshape((3, 1))
 at = np.array([0, 0, 0]).reshape((3, 1))
-miniJerkTrajPlanner = MinimumTrajPlanner(path, 1, 20, v0, a0, vt, at, 3)
+miniJerkTrajPlanner = MinimumTrajPlanner(path, 0.2, 100, v0, a0, vt, at, 4)
 traj = miniJerkTrajPlanner.computeTraj()
+trajAcc = miniJerkTrajPlanner.computeTrajAcc()
 
 # print(traj.shape)
 
 end = time.time()
+
+# 绘制轨迹
+# for i in range(traj.shape[1] - 1):
+#     # 绘制轨迹点
+#     ax.scatter(traj[0, i], traj[1, i], traj[2, i], c='r', marker='.')
+
+plt.show()
+
+# 绘制轨迹x，y，z三个方向的加速度曲线虚线
+plt.figure()
+plt.subplot(3, 1, 1)
+plt.plot(traj[3, :], 'r')
+# plt.plot(trajAcc[0, :], 'r--')
+plt.subplot(3, 1, 2)
+plt.plot(traj[4, :], 'g')
+# plt.plot(trajAcc[1, :], 'g--')
+plt.subplot(3, 1, 3)
+plt.plot(traj[5, :], 'b')
+# plt.plot(trajAcc[2, :], 'b--')
+plt.show()
 
 print("trajPlanner: ", end - start)
 
